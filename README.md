@@ -28,7 +28,7 @@ PowersDiNSpector is a PowerShell-based tool designed to help security enthusiast
 2. Clone or download this repository:
 
 ```powershell
-git clone https://github.com/YOUR_USERNAME/PowersDiNSpector.git
+git clone https://github.com/Luanqmata/PowersDiNSpector.git
 ```
 
 3. Navigate to the folder:
