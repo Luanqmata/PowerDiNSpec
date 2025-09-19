@@ -317,7 +317,7 @@ function Busca-Por-DNS {
         Write-Host "                  +==================================================+" -ForegroundColor $cor
         Write-Host "                  ||                                                ||" -ForegroundColor $cor
         Write-Host "                  ||           === PowersDiNSpector ===             ||" -ForegroundColor $cor
-        Write-Host "                  ||                               Alpha ~ 0.5v     ||" -ForegroundColor $cor
+        Write-Host "                  ||                               Alpha ~ 1.6.4v   ||" -ForegroundColor $cor
         Write-Host "                  +==================================================+" -ForegroundColor $cor
         Write-Host "                  ||                                                ||" -ForegroundColor $cor
         Write-Host "                  ||       1. Capture Server Headers                ||" -ForegroundColor $cor
