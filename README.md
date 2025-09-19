@@ -80,10 +80,3 @@ This program is licensed under the **GNU Affero General Public License v3.0** (A
 You can redistribute and/or modify it under the terms of this license.
 
 See the LICENSE file or visit [https://www.gnu.org/licenses/agpl-3.0.html](https://www.gnu.org/licenses/agpl-3.0.html).
-
----
-
-## Author
-
-Luan Calazans, 2025
-Powered by **Caffeine & PowerShell** ☕💻
