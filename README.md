@@ -80,3 +80,9 @@ This program is licensed under the **GNU Affero General Public License v3.0** (A
 You can redistribute and/or modify it under the terms of this license.
 
 See the LICENSE file or visit [https://www.gnu.org/licenses/agpl-3.0.html](https://www.gnu.org/licenses/agpl-3.0.html).
+
+---
+
+<p align="center">
+  <img width="551" height="475" alt="image" src="https://github.com/user-attachments/assets/edd8a3e0-3936-4c03-99a9-a0250d426eb8" />
+</p>
