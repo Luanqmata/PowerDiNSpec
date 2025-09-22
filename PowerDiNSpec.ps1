@@ -360,7 +360,7 @@ function Busca-Por-DNS {
         Clear-Host
         Write-Host "                                   +==================================================+" -ForegroundColor $cor
         Write-Host "                                   ||                                                ||" -ForegroundColor $cor
-        Write-Host "                                   ||          === PowersDiNSpector ===              ||" -ForegroundColor $cor
+        Write-Host "                                   ||              === PowerDiNSpec ===              ||" -ForegroundColor $cor
         Write-Host "                                   ||                                 Alpha ~ 1.7.4v ||" -ForegroundColor $cor
         Write-Host "                                   +==================================================+" -ForegroundColor $cor
         Write-Host "                                   ||                                                ||" -ForegroundColor $cor
