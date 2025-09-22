@@ -79,3 +79,16 @@ Enter the website URL (e.g., https://example.com)
 ```
 
 The tool will sequentially run all checks and display the results in the terminal.
+
+---
+License
+
+This program is licensed under the GNU Affero General Public License v3.0 (AGPL-3.0).
+You can redistribute and/or modify it under the terms of this license.
+
+See the LICENSE file or visit https://www.gnu.org/licenses/agpl-3.0.html.
+
+Author
+
+Luan Calazans, 2025
+Powered by PowerShell ☕💻
