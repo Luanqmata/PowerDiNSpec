@@ -1,8 +1,8 @@
-# PowersDiNSpector
+# PowerDiNSpec
 
 *PowerShell DNS Recon Tool*
 
-PowersDiNSpector is a PowerShell-based tool designed to help security enthusiasts and penetration testers perform reconnaissance on websites and DNS records. It allows you to scan server headers, HTTP methods, links, HTML words, detect technologies, check status codes, and more.
+PowerDiNSpec is a PowerShell-based tool designed to help security enthusiasts and penetration testers perform reconnaissance on websites and DNS records. It allows you to scan server headers, HTTP methods, links, HTML words, detect technologies, check status codes, and more.
 
 ---
 
