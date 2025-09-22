@@ -1,6 +1,6 @@
 <#
 ===============================================================================
-PowersDiNSpector - PowerShell DNS Recon Tool
+PowerDiNSpec - PowerShell DNS Recon Tool
 ===============================================================================
 
 Copyright (C) 2025 Luan Calazans
@@ -361,7 +361,7 @@ function Busca-Por-DNS {
         Write-Host "                                   +==================================================+" -ForegroundColor $cor
         Write-Host "                                   ||                                                ||" -ForegroundColor $cor
         Write-Host "                                   ||              === PowerDiNSpec ===              ||" -ForegroundColor $cor
-        Write-Host "                                   ||                                 Alpha ~ 1.7.4v ||" -ForegroundColor $cor
+        Write-Host "                                   ||                                 Alpha ~ 1.7.5v ||" -ForegroundColor $cor
         Write-Host "                                   +==================================================+" -ForegroundColor $cor
         Write-Host "                                   ||                                                ||" -ForegroundColor $cor
         Write-Host "                                   ||       1. Capture Server Headers                ||" -ForegroundColor $cor
