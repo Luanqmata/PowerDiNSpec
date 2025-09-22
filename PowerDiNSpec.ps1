@@ -356,7 +356,7 @@ function Busca-Por-DNS {
 
     # === Menu Principal ===
     while ($true) {
-        $cor = "Green"
+        $cor = "Red"
         Clear-Host
         Write-Host "                                   +==================================================+" -ForegroundColor $cor
         Write-Host "                                   ||                                                ||" -ForegroundColor $cor
