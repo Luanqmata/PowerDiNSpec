@@ -22,6 +22,14 @@ PowerDiNSpec is a PowerShell-based tool designed to help security enthusiasts an
 * Log all actions to a file
 
 ---
+## Security & Ethical Use Notice ⚠️
+
+PowerDiNSpec is intended only for educational purposes, authorized penetration testing, or personal lab environments.
+Using this tool on websites or networks without explicit permission from the owner may be illegal and could result in criminal or civil penalties.
+
+Always ensure you have authorization before scanning any system and respect the ethical guidelines of cybersecurity.
+
+---
 
 ## Installation
 
