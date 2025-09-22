@@ -315,7 +315,7 @@ function Busca-Por-DNS {
                 }
             }
             catch {
-                Write-Host "[${CleanHost}:${Port}] Erro: No Connection " -ForegroundColor Red # Erro: $_
+                Write-Host "[${CleanHost}:${Port}] Erro: No Connection Established" -ForegroundColor Red # Erro: $_
                 Write-Log "No connection to ${CleanHost}:${Port} - $($_.Exception.Message)" "WARNING"
             }
         }
@@ -328,12 +328,12 @@ function Busca-Por-DNS {
         Write-Log "Starting RunAllScans for: $url"
         
         $scans = @(
-            @{Name="Server Headers"; Function={ScanHeaders -url $url}},
-            @{Name="Allowed HTTP Methods"; Function={ScanOptions -url $url}},
-            @{Name="Links in HTML"; Function={ScanLinks -url $url}},
-            @{Name="Technologies in Use"; Function={ScanTech -url $url}},
             @{Name="HTTP Status Code"; Function={ScanStatusCode -url $url}},
             @{Name="Page Title"; Function={ScanTitle -url $url}},
+            @{Name="Allowed HTTP Methods"; Function={ScanOptions -url $url}},
+            @{Name="Server Headers"; Function={ScanHeaders -url $url}}, 
+            @{Name="Technologies in Use"; Function={ScanTech -url $url}},
+            @{Name="Links in HTML"; Function={ScanLinks -url $url}}, 
             @{Name="Robots.txt"; Function={ScanRobotsTxt -url $url}},
             @{Name="Sitemap.xml"; Function={ScanSitemap -url $url}},
             @{Name="Port Banner Grabbing"; Function={Get-PortBanner -url $url}},
@@ -361,7 +361,7 @@ function Busca-Por-DNS {
         Write-Host "                                   +==================================================+" -ForegroundColor $cor
         Write-Host "                                   ||                                                ||" -ForegroundColor $cor
         Write-Host "                                   ||              === PowerDiNSpec ===              ||" -ForegroundColor $cor
-        Write-Host "                                   ||                                 Alpha ~ 1.7.5v ||" -ForegroundColor $cor
+        Write-Host "                                   ||                                 Alpha ~ 1.8.1v ||" -ForegroundColor $cor
         Write-Host "                                   +==================================================+" -ForegroundColor $cor
         Write-Host "                                   ||                                                ||" -ForegroundColor $cor
         Write-Host "                                   ||       1. Capture Server Headers                ||" -ForegroundColor $cor
