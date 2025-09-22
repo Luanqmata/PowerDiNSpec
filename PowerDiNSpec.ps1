@@ -142,7 +142,7 @@ function Busca-Por-DNS {
                          Sort-Object
 
             # Filter common words
-            $commonWords = @('the', 'and', 'for', 'you', 'your', 'this', 'that', 'with', 'have', 'from')
+            $commonWords = @('n0n9')
             $palavras = $palavras | Where-Object { $commonWords -notcontains $_.ToLower() }
 
             Write-Host "`nTotal unique words found: $($palavras.Count)" -ForegroundColor Gray
