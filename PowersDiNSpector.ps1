@@ -114,7 +114,7 @@ function Busca-Por-DNS {
             $links = $response.Links.Href | Where-Object { $_ -match '^http' } | Select-Object -Unique
             if ($links) {
                 $links | ForEach-Object {
-                    Write-Host "  $_" -ForegroundColor White
+                    Write-Host "   $_" -ForegroundColor White
                 }
                 Write-Log "Found $($links.Count) unique links"
             } else {
@@ -128,7 +128,7 @@ function Busca-Por-DNS {
     function ScanHTML {
         param ([string]$url)
         try {
-            Write-Host "`nObtaining words from the HTML source code..." -ForegroundColor Yellow
+            Write-Host "`n Obtaining words from the HTML source code..." -ForegroundColor Yellow
             Write-Log "Starting ScanHTML for: $url"
             Start-Sleep -Seconds 2
 
@@ -137,9 +137,9 @@ function Busca-Por-DNS {
 
             # Extract words with improved regex
             $palavras = $htmlContent -split '[^\p{L}0-9_\-]+' |
-                    Where-Object { $_.Length -gt 2 -and -not $_.StartsWith('#') -and -not $_.StartsWith('//') } |
-                    Select-Object -Unique |
-                    Sort-Object
+                         Where-Object { $_.Length -gt 2 -and -not $_.StartsWith('#') -and -not $_.StartsWith('//') } |
+                         Select-Object -Unique |
+                         Sort-Object
 
             # Filter common words
             $commonWords = @('the', 'and', 'for', 'you', 'your', 'this', 'that', 'with', 'have', 'from')
@@ -152,7 +152,7 @@ function Busca-Por-DNS {
                 # Show example words
                 Write-Host "`nExample of found words (first 10):" -ForegroundColor Yellow
                 $palavras | Select-Object -First 10 | ForEach-Object {
-                    Write-Host "  $_" -ForegroundColor White
+                    Write-Host "   $_" -ForegroundColor White
                 }
 
                 $save = Read-Host "`nDo you want to save the words to a file for fuzzing? (Y/N)"
@@ -182,7 +182,7 @@ function Busca-Por-DNS {
     function ScanTech {
         param ([string]$url)
         try {
-            Write-Host "`nDetecting technologies in use..." -ForegroundColor Yellow
+            Write-Host "`n Detecting technologies in use..." -ForegroundColor Yellow
             Write-Log "Starting ScanTech for: $url"
 
             $response = Invoke-WebRequestSafe -Uri $url
@@ -213,7 +213,7 @@ function Busca-Por-DNS {
     function ScanStatusCode {
         param ([String]$url)
         try {
-            Write-Host "`nObtaining HTTP status code..." -ForegroundColor Yellow
+            Write-Host "`n Obtaining HTTP status code..." -ForegroundColor Yellow
             Write-Log "Starting ScanStatusCode for: $url"
             $response = Invoke-WebRequestSafe -Uri $url
             Write-Host "`nStatus Code:" -ForegroundColor Green
@@ -227,7 +227,7 @@ function Busca-Por-DNS {
     function ScanTitle {
         param ([string]$url)
         try {
-            Write-Host "`nObtaining page title..." -ForegroundColor Yellow
+            Write-Host "`n Obtaining page title..." -ForegroundColor Yellow
             Write-Log "Starting ScanTitle for: $url"
             
             $response = Invoke-WebRequestSafe -Uri $url
@@ -277,6 +277,50 @@ function Busca-Por-DNS {
         }
     }
     
+    function Get-PortBanner {
+        param (
+            [string]$url,
+            [int[]]$Ports = @(21,22,23,25,80,110,143,443,3389,8080)
+        )
+
+        Write-Host "`n Checking Port Banner's ... `n" -ForegroundColor Yellow
+        Write-Log "Starting Get-PortBanner" "INFO"
+        $uri = [System.Uri]$url
+        $CleanHost = $uri.Host
+        
+        foreach ($Port in $Ports) {
+            try {
+                $client = New-Object System.Net.Sockets.TcpClient
+                $client.ReceiveTimeout = 3000
+                $client.SendTimeout = 3000
+                $client.Connect($CleanHost, $Port)
+
+                if ($client.Connected) {
+                    $stream = $client.GetStream()
+                    $buffer = New-Object Byte[] 1024
+                    Start-Sleep -Milliseconds 500
+
+                    $read = $stream.Read($buffer, 0, 1024)
+                    $response = [System.Text.Encoding]::ASCII.GetString($buffer, 0, $read)
+
+                    if ($response) {
+                        Write-Host "[${CleanHost}:${Port}] Banner Found:$response" -ForegroundColor Green
+                        Write-Log "Banner found on ${CleanHost}:${Port} - $response"
+                    } else {
+                        Write-Host "[${CleanHost}:${Port}] Sem banner visível" -ForegroundColor Yellow
+                        Write-Log "No banner visible on ${CleanHost}:${Port}" "INFO"
+                    }
+                    $stream.Close()
+                    $client.Close()
+                }
+            }
+            catch {
+                Write-Host "[${CleanHost}:${Port}] Erro: No Connection " -ForegroundColor Red # Erro: $_
+                Write-Log "No connection to ${CleanHost}:${Port} - $($_.Exception.Message)" "WARNING"
+            }
+        }
+    }
+
     function RunAllScans {
         param ([string]$url)
         clear-host
@@ -292,7 +336,8 @@ function Busca-Por-DNS {
             @{Name="Page Title"; Function={ScanTitle -url $url}},
             @{Name="Robots.txt"; Function={ScanRobotsTxt -url $url}},
             @{Name="Sitemap.xml"; Function={ScanSitemap -url $url}},
-            @{Name="Words for Fuzzing"; Function={ScanHTML -url $url}}
+            @{Name="Port Banner Grabbing"; Function={Get-PortBanner -url $url}},
+            @{Name="Words for Fuzzing"; Function={ScanHTML -url $url}}   
         )
         
         $counter = 0
@@ -309,35 +354,34 @@ function Busca-Por-DNS {
         $null = Read-Host
     }
 
-
     # === Menu Principal ===
     while ($true) {
         $cor = "Green"
         Clear-Host
-        Write-Host "                  +==================================================+" -ForegroundColor $cor
-        Write-Host "                  ||                                                ||" -ForegroundColor $cor
-        Write-Host "                  ||           === PowersDiNSpector ===             ||" -ForegroundColor $cor
-        Write-Host "                  ||                               Alpha ~ 1.6.4v   ||" -ForegroundColor $cor
-        Write-Host "                  +==================================================+" -ForegroundColor $cor
-        Write-Host "                  ||                                                ||" -ForegroundColor $cor
-        Write-Host "                  ||       1. Capture Server Headers                ||" -ForegroundColor $cor
-        Write-Host "                  ||       2. Discover Allowed HTTP Methods         ||" -ForegroundColor $cor
-        Write-Host "                  ||       3. List Links Found in HTML              ||" -ForegroundColor $cor
-        Write-Host "                  ||       4. Get All Words from the Site           ||" -ForegroundColor $cor
-        Write-Host "                  ||       5. Detect Technologies in Use            ||" -ForegroundColor $cor
-        Write-Host "                  ||       6. Get HTTP Status Code                  ||" -ForegroundColor $cor
-        Write-Host "                  ||       7. Get the Page <title>                  ||" -ForegroundColor $cor
-        Write-Host "                  ||       8. Check the robots.txt File             ||" -ForegroundColor $cor
-        Write-Host "                  ||       9. Check if Site has a Sitemap           ||" -ForegroundColor $cor
-        Write-Host "                  ||      10. Run All Options (1 to 9)              ||" -ForegroundColor $cor
-        Write-Host "                  ||      11. Exit                                  ||" -ForegroundColor $cor
-        Write-Host "                  ||                                                ||" -ForegroundColor $cor
-        Write-Host "                  +==================================================+" -ForegroundColor $cor
+        Write-Host "                                   +==================================================+" -ForegroundColor $cor
+        Write-Host "                                   ||                                                ||" -ForegroundColor $cor
+        Write-Host "                                   ||          === PowersDiNSpector ===              ||" -ForegroundColor $cor
+        Write-Host "                                   ||                                 Alpha ~ 1.7.4v ||" -ForegroundColor $cor
+        Write-Host "                                   +==================================================+" -ForegroundColor $cor
+        Write-Host "                                   ||                                                ||" -ForegroundColor $cor
+        Write-Host "                                   ||       1. Capture Server Headers                ||" -ForegroundColor $cor
+        Write-Host "                                   ||       2. Discover Allowed HTTP Methods         ||" -ForegroundColor $cor
+        Write-Host "                                   ||       3. List Links Found in HTML              ||" -ForegroundColor $cor
+        Write-Host "                                   ||       4. Get All Words from the Site           ||" -ForegroundColor $cor
+        Write-Host "                                   ||       5. Detect Technologies in Use            ||" -ForegroundColor $cor
+        Write-Host "                                   ||       6. Get HTTP Status Code                  ||" -ForegroundColor $cor
+        Write-Host "                                   ||       7. Get the Page <title>                  ||" -ForegroundColor $cor
+        Write-Host "                                   ||       8. Check the robots.txt File             ||" -ForegroundColor $cor
+        Write-Host "                                   ||       9. Check if Site has a Sitemap           ||" -ForegroundColor $cor
+        Write-Host "                                   ||      10. Capture Port's Banner's               ||" -ForegroundColor $cor
+        Write-Host "                                   ||      11. Run All Scans (1 to 10)               ||" -ForegroundColor $cor
+        Write-Host "                                   ||      12. Exit                                  ||" -ForegroundColor $cor
+        Write-Host "                                   ||                                                ||" -ForegroundColor $cor
+        Write-Host "                                   +==================================================+" -ForegroundColor $cor
         Write-Host "`nLog is being saved to: $logFile" -ForegroundColor Yellow
         Write-Host "`n"
 
-
-        $option = Read-Host "Choose an option (1-11)"
+        $option = Read-Host "Choose an option (1-12)"
 
         switch ($option) {
             1 {
@@ -433,6 +477,16 @@ function Busca-Por-DNS {
             10 {
                 $url = Read-Host "`nEnter the website URL (e.g., https://example.com)"
                 if (Test-ValidUrl $url) {
+                    Get-PortBanner -url $url
+                } else {
+                    Write-Host "Invalid URL. Use http:// or https://" -ForegroundColor Red
+                }
+                Write-Host "`nPress Enter to continue..." -ForegroundColor Red
+                $null = Read-Host
+            }
+            11 {
+                $url = Read-Host "`nEnter the website URL (e.g., https://example.com)"
+                if (Test-ValidUrl $url) {
                     RunAllScans -url $url
                 } else {
                     Write-Host "Invalid URL. Use http:// or https://" -ForegroundColor Red
@@ -440,10 +494,10 @@ function Busca-Por-DNS {
                     $null = Read-Host
                 }
             }
-            11 {
+            12 {
                 Write-Host "`nThanks For Using PowersDiNSpector`nObrigado Por Usar PowersDiNSpector " -ForegroundColor Green
-                Write-Host "`nPowered by caffeine & PowerShell - Luan Calazans 2025/09/18" -ForegroundColor DarkGray
-                Write-Log "`n`nExiting PowersDiNSpector ...`n`n`n" -ForegroundColor Green
+                Write-Host "`nPowered by PowerShell - Luan Calazans - 2025" -ForegroundColor DarkGray
+                Write-Log "`n`nExiting PowersDiNSpector ...`n`n`n" "INFO"
                 return
             }
             default {
@@ -454,5 +508,5 @@ function Busca-Por-DNS {
         }
     }
 }
-# Iniciar a função
+
 Busca-Por-DNS
