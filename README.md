@@ -41,10 +41,11 @@ cd PowersDiNSpector
 
 ```powershell
 Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
-
-Unblock-File -Path "C:\Users\luanb\Desktop\PowersDiNSpector.ps1"
-
 ```
+
+<img width="361" height="508" alt="image" src="https://github.com/user-attachments/assets/e52f7f5f-b129-4294-bbdb-51488eb2428c" />
+<img width="367" height="513" alt="image" src="https://github.com/user-attachments/assets/ed6b684e-e6a9-458f-a9d0-f9dc8abb84a2" />
+
 
 ---
 
