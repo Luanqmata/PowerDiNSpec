@@ -28,20 +28,21 @@ PowersDiNSpector is a PowerShell-based tool designed to help security enthusiast
 1. Make sure you have *PowerShell 5.1* or later installed on Windows.
 2. Clone or download this repository:
 
-powershell
+```powershell
 git clone https://github.com/Luanqmata/PowerDiNSpec.git
-
+```
 
 3. Navigate to the folder:
 
-powershell
+```powershell
 cd PowerDiNSpec
-
+```
 
 4. If the script is blocked by execution policies, run:
 
-powershell
+```powershell
 Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
+```
 
 <p align="center">
   <img width="361" height="508" alt="image" src="https://github.com/user-attachments/assets/e52f7f5f-b129-4294-bbdb-51488eb2428c" />
@@ -55,9 +56,9 @@ Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
 1. Open PowerShell.
 2. Run the script:
 
-powershell
+```powershell
 .\PowerDiNSpec.ps1
-
+```
 
 3. The menu will appear. Choose an option (1-12) to perform the desired scan.
 4. Enter the target URL or host when prompted.
