@@ -24,13 +24,13 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 function Logo_Menu {
     $ascii = @"
     
-                                                   _                        _
-       _  _      /\ /\                            ( ) ___,      _ __    _  ( ) _ __                  ___
-     _| || |_    | '_ \  ____ __      __ ___  _ __ \||  _'\  _ | '_ \  | | |/ | '_ \  /\/\   ___    |__ \
-    |_  ..  _|   | |_) |/ _//\\ \ /\ / // _ \| '__|  | | | || || | | |/ __|   | |_) |/  _ \ / __|     / /
-    |_      _|   | .__/| (//) |\ V  V /|  __/| |     | |_/ || || | | |\__ \   | .__/|  ___/| (__     |_|
-      |_||_|     |_|    \//__/  \_/\_/  \___||_|     |____/ |_||_| |_||___/   |_|    \____| \___|
-                                         | |                (_)        |_|                           (_)      Version 1.8.5
+                                                                                   _                        _
+                                       _  _      /\ /\                            ( ) ___,      _ __    _  ( ) _ __                  ___
+                                     _| || |_    | '_ \  ____ __      __ ___  _ __ \||  _'\  _ | '_ \  | | |/ | '_ \  /\/\   ___    |__ \
+                                    |_  ..  _|   | |_) |/ _//\\ \ /\ / // _ \| '__|  | | | || || | | |/ __|   | |_) |/  _ \ / __|     / /
+                                    |_      _|   | .__/| (//) |\ V  V /|  __/| |     | |_/ || || | | |\__ \   | .__/|  ___/| (__     |_|
+                                      |_||_|     |_|    \//__/  \_/\_/  \___||_|     |____/ |_||_| |_||___/   |_|    \____| \___|
+                                                                         | |                (_)        |_|                           (_)      Version 1.8.5
 
                                          
 "@ -split "`n"
@@ -373,29 +373,46 @@ function Busca-Por-DNS {
         $null = Read-Host
     }
 
-    # === Menu Principal ===
-    while ($true) {
-       $cor = "Red"
-        Clear-Host
-        Logo_Menu
-        Write-Host ""
-        Write-Host "                                     [ 1 ]   Capture Server Headers"        -ForegroundColor $cor
-        Write-Host "                                     [ 2 ]   Discover Allowed HTTP Methods" -ForegroundColor $cor
-        Write-Host "                                     [ 3 ]   List Links Found in HTML"      -ForegroundColor $cor
-        Write-Host "                                     [ 4 ]   Get All Words from the Site"   -ForegroundColor $cor
-        Write-Host "                                     [ 5 ]   Detect Technologies in Use"   -ForegroundColor $cor
-        Write-Host "                                     [ 6 ]   Get HTTP Status Code"          -ForegroundColor $cor
-        Write-Host "                                     [ 7 ]   Get the Page <title>"          -ForegroundColor $cor
-        Write-Host "                                     [ 8 ]   Check the robots.txt File"     -ForegroundColor $cor
-        Write-Host "                                     [ 9 ]   Check if Site has a Sitemap"   -ForegroundColor $cor
-        Write-Host "                                    [ 10 ]   Capture Port's Banner's"       -ForegroundColor $cor
-        Write-Host "                                    [ 11 ]   Run All Scans (1 to 10)"       -ForegroundColor $cor
-        Write-Host "                                    [ 12 ]   Exit"                          -ForegroundColor $cor
-        Write-Host ""
-        Write-Host "`nLog is being saved to: $logFile" -ForegroundColor Yellow
-        Write-Host "`n"
+# === Menu Principal ===
+while ($true) {
+    Clear-Host
+    Logo_Menu
+    Write-Host ""
 
-        $option = Read-Host "Choose an option (1-12)"
+    $menus = @(
+        "Capture Server Headers",
+        "Discover Allowed HTTP Methods",
+        "List Links Found in HTML",
+        "Get All Words from the Site",
+        "Detect Technologies in Use",
+        "Get HTTP Status Code",
+        "Get the Page <title>",
+        "Check the robots.txt File",
+        "Check if Site has a Sitemap",
+        "Capture Port's Banner's",
+        "Run All Scans (1 to 10)",
+        "Exit"
+    )
+
+    for ($i=0; $i -lt $menus.Count; $i++) {
+        $num = $i + 1
+        $spacing = " " * 74
+        Write-Host -NoNewline "$spacing["
+        Write-Host -NoNewline (" {0} " -f $num) -ForegroundColor Magenta
+        Write-Host "]   " -NoNewline
+        Write-Host "$($menus[$i])" -ForegroundColor Red
+        Write-Host ""
+    }
+
+    Write-Host "`n `n`n                                                                                                                           Log is being saved to: $logFile" -ForegroundColor Yellow
+    Write-Host "`n`n`n"
+
+    # === Read-Host em vermelho ===
+    $origColor = [Console]::ForegroundColor
+    [Console]::ForegroundColor = "Green"
+    Write-Host -NoNewline "             Choose an option (1-12): "
+    $option = Read-Host 
+    [Console]::ForegroundColor = $origColor
 
         switch ($option) {
             1 {
@@ -509,13 +526,15 @@ function Busca-Por-DNS {
                 }
             }
             12 {
-                Write-Host "`nThanks For Using PowersDiNSpector`nObrigado Por Usar PowersDiNSpector " -ForegroundColor Green
-                Write-Host "`nPowered by PowerShell - Luan Calazans - 2025" -ForegroundColor DarkGray
+                Clear-Host
+                Logo_Menu
+                Write-Host "`n             Thanks For Using PowersDiNSpector`n             Obrigado Por Usar PowersDiNSpector " -ForegroundColor Green
+                Write-Host "`n             Powered by PowerShell - Luan Calazans - 2025" -ForegroundColor DarkGray
                 Write-Log "`n`nExiting PowersDiNSpector ...`n`n`n" "INFO"
                 return
             }
             default {
-                Write-Host "`nInvalid option. Choose a number between 1 and 12." -ForegroundColor Red
+                Write-Host "`n`nInvalid option. Choose a number between 1 and 12." -ForegroundColor Red
                 Write-Host "`nPress Enter to continue..." -ForegroundColor Green
                 $null = Read-Host
             }
