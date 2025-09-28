@@ -21,6 +21,25 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 ===============================================================================
 #>
 
+function Logo_Menu {
+    $ascii = @"
+    
+                                                   _                        _
+       _  _      /\ /\                            ( ) ___,      _ __    _  ( ) _ __                  ___
+     _| || |_    | '_ \  ____ __      __ ___  _ __ \||  _'\  _ | '_ \  | | |/ | '_ \  /\/\   ___    |__ \
+    |_  ..  _|   | |_) |/ _//\\ \ /\ / // _ \| '__|  | | | || || | | |/ __|   | |_) |/  _ \ / __|     / /
+    |_      _|   | .__/| (//) |\ V  V /|  __/| |     | |_/ || || | | |\__ \   | .__/|  ___/| (__     |_|
+      |_||_|     |_|    \//__/  \_/\_/  \___||_|     |____/ |_||_| |_||___/   |_|    \____| \___|
+                                         | |                (_)        |_|                           (_)      Version 1.8.5
+
+                                         
+"@ -split "`n"
+
+    foreach ($line in $ascii) {
+        Write-Host $line -ForegroundColor Red
+    }
+}
+
 function Busca-Por-DNS {
     $headers = @{
         "User-Agent" = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/100.0.0.0 Safari/537.36"
@@ -356,28 +375,23 @@ function Busca-Por-DNS {
 
     # === Menu Principal ===
     while ($true) {
-        $cor = "Red"
+       $cor = "Red"
         Clear-Host
-        Write-Host "                                   +==================================================+" -ForegroundColor $cor
-        Write-Host "                                   ||                                                ||" -ForegroundColor $cor
-        Write-Host "                                   ||              === PowerDiNSpec ===              ||" -ForegroundColor $cor
-        Write-Host "                                   ||                                 Alpha ~ 1.8.1v ||" -ForegroundColor $cor
-        Write-Host "                                   +==================================================+" -ForegroundColor $cor
-        Write-Host "                                   ||                                                ||" -ForegroundColor $cor
-        Write-Host "                                   ||       1. Capture Server Headers                ||" -ForegroundColor $cor
-        Write-Host "                                   ||       2. Discover Allowed HTTP Methods         ||" -ForegroundColor $cor
-        Write-Host "                                   ||       3. List Links Found in HTML              ||" -ForegroundColor $cor
-        Write-Host "                                   ||       4. Get All Words from the Site           ||" -ForegroundColor $cor
-        Write-Host "                                   ||       5. Detect Technologies in Use            ||" -ForegroundColor $cor
-        Write-Host "                                   ||       6. Get HTTP Status Code                  ||" -ForegroundColor $cor
-        Write-Host "                                   ||       7. Get the Page <title>                  ||" -ForegroundColor $cor
-        Write-Host "                                   ||       8. Check the robots.txt File             ||" -ForegroundColor $cor
-        Write-Host "                                   ||       9. Check if Site has a Sitemap           ||" -ForegroundColor $cor
-        Write-Host "                                   ||      10. Capture Port's Banner's               ||" -ForegroundColor $cor
-        Write-Host "                                   ||      11. Run All Scans (1 to 10)               ||" -ForegroundColor $cor
-        Write-Host "                                   ||      12. Exit                                  ||" -ForegroundColor $cor
-        Write-Host "                                   ||                                                ||" -ForegroundColor $cor
-        Write-Host "                                   +==================================================+" -ForegroundColor $cor
+        Logo_Menu
+        Write-Host ""
+        Write-Host "                                     [ 1 ]   Capture Server Headers"        -ForegroundColor $cor
+        Write-Host "                                     [ 2 ]   Discover Allowed HTTP Methods" -ForegroundColor $cor
+        Write-Host "                                     [ 3 ]   List Links Found in HTML"      -ForegroundColor $cor
+        Write-Host "                                     [ 4 ]   Get All Words from the Site"   -ForegroundColor $cor
+        Write-Host "                                     [ 5 ]   Detect Technologies in Use"   -ForegroundColor $cor
+        Write-Host "                                     [ 6 ]   Get HTTP Status Code"          -ForegroundColor $cor
+        Write-Host "                                     [ 7 ]   Get the Page <title>"          -ForegroundColor $cor
+        Write-Host "                                     [ 8 ]   Check the robots.txt File"     -ForegroundColor $cor
+        Write-Host "                                     [ 9 ]   Check if Site has a Sitemap"   -ForegroundColor $cor
+        Write-Host "                                    [ 10 ]   Capture Port's Banner's"       -ForegroundColor $cor
+        Write-Host "                                    [ 11 ]   Run All Scans (1 to 10)"       -ForegroundColor $cor
+        Write-Host "                                    [ 12 ]   Exit"                          -ForegroundColor $cor
+        Write-Host ""
         Write-Host "`nLog is being saved to: $logFile" -ForegroundColor Yellow
         Write-Host "`n"
 
