@@ -46,13 +46,7 @@ git clone https://github.com/Luanqmata/PowerDiNSpec.git
 cd PowerDiNSpec
 ```
 
-4. If the script is blocked by execution policies, run:
-
-```powershell
-Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
-```
-
-5. Unlock Script
+4. Unlock Script
 
 <p align="center">
   <img width="361" height="508" alt="screenshot1" src="https://github.com/user-attachments/assets/e52f7f5f-b129-4294-bbdb-51488eb2428c" />
