@@ -102,3 +102,6 @@ See the LICENSE file or visit https://www.gnu.org/licenses/agpl-3.0.html.
 
 Luan Calazans, 2025
 Powered by PowerShell ☕💻
+
+
+> https://github.com/EliteLoser/WriteAscii/blob/master/letters.xml Fonts
