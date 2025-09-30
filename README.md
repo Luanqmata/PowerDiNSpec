@@ -2,11 +2,10 @@
 
 <img width="1373" height="732" alt="image" src="https://github.com/user-attachments/assets/288c8138-d75d-49cf-a761-cadc18336f08" />
 
-<p align="center">
- 
-  **PowerShell DNS Recon Tool**
+
+##  **PowerShell DNS Recon Tool**
   
-</p>
+
 
 PowerDiNSpec is a PowerShell-based tool designed to help security enthusiasts and penetration testers perform reconnaissance on websites and DNS records. It allows you to scan server headers, HTTP methods, links, HTML words, detect technologies, check status codes, and more.
 
