@@ -49,8 +49,8 @@ function Show-InputPrompt {
     $version = [System.Environment]::OSVersion.Version.ToString()
 
     $inputView = @"
-               /----[ $User@Win= $version ]-[~]---[#]  -  $input_name
-              /___ -> :  
+               /~~~~[ $User@Win= $version ]-[~]--[#] - $input_name
+              /__~---~>:  
 "@
 
     $lines = $inputView -split "`n"
@@ -65,7 +65,6 @@ function Show-InputPrompt {
     
     return $option
 }
-
 
 function Busca-Por-DNS {
     $headers = @{
