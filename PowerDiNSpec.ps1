@@ -49,7 +49,7 @@ function Show-InputPrompt {
     $version = [System.Environment]::OSVersion.Version.ToString()
 
     $inputView = @"
-               /~~~~[ $User@Win= $version ]-[~]--[#] - $input_name
+               /~---~[ $User@Win= $version ]-[~]--[#] - $input_name
               /__~---~>:  
 "@
 
