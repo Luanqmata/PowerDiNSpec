@@ -30,7 +30,7 @@ function Logo_Menu {
                                     |_  ..  _|   | |_) |/ _//\\ \ /\ / // _ \| '__|  | | | || || | | |/ __|   | |_) |/  _ \ / __|     / /
                                     |_      _|   | .__/| (//) |\ V  V /|  __/| |     | |_/ || || | | |\__ \   | .__/|  ___/| (__     |_|
                                       |_||_|     |_|    \//__/  \_/\_/  \___||_|     |____/ |_||_| |_||___/   |_|    \____| \___|
-                                                        //               | |                (_)        |_|                           (_)           1.9.2v
+                                                        //               | |                (_)        |_|                           (_)           1.9.3v
 
                                          
 "@ -split "`n"
@@ -39,25 +39,30 @@ function Logo_Menu {
         Write-Host $line -ForegroundColor Red
     }
 }
-
 function Show-InputPrompt {
     param(
         [string]$User = $env:USERNAME,
-        [string]$input_name = "Choose an option"
+        [string]$input_name = ""
     )
     
     $version = [System.Environment]::OSVersion.Version.ToString()
 
-    $inputView = @"
-               /~---~[ $User@Win= $version ]-[~]--[#] - $input_name
-              /__~---~>:  
-"@
+    Write-Host "               //~--~[ " -NoNewline -ForegroundColor Red
+    Write-Host "$User" -NoNewline -ForegroundColor Gray
+    Write-Host "@Win_Version=" -NoNewline -ForegroundColor Cyan
+    Write-Host "/$version/" -NoNewline -ForegroundColor Yellow
+    Write-Host " ]-[" -NoNewline -ForegroundColor Red
+    Write-Host "~" -NoNewline -ForegroundColor White
+    Write-Host "]--[" -NoNewline -ForegroundColor Red
+    Write-Host "#" -NoNewline -ForegroundColor White
+    Write-Host "]---> " -NoNewline -ForegroundColor Red
+    Write-Host "$input_name" -ForegroundColor White
 
-    $lines = $inputView -split "`n"
-    
-    Write-Host $lines[0] -ForegroundColor Red
-    Write-Host $lines[1] -NoNewline -ForegroundColor Red
-    
+    Write-Host "              /__~----~" -NoNewline -ForegroundColor Red
+    Write-Host " > " -NoNewline -ForegroundColor Red
+    Write-Host "@: " -NoNewline -ForegroundColor White
+
+    # Entrada do usuário em magenta
     $origColor = [Console]::ForegroundColor
     [Console]::ForegroundColor = "Magenta"
     $option = Read-Host
@@ -371,7 +376,8 @@ function Busca-Por-DNS {
     function RunAllScans {
         param ([string]$url)
         clear-host
-        Write-Host "`n=== Starting all checks for URL: $url ===`n" -ForegroundColor Red
+        #Logo_Menu # fazer um logo_menu 2
+        Write-Host "`n                                  === Starting all checks for URL: $url ===`n" -ForegroundColor Red
         Write-Log "Starting RunAllScans for: $url"
         
         $scans = @(
@@ -390,14 +396,14 @@ function Busca-Por-DNS {
         $counter = 0
         foreach ($scan in $scans) {
             $counter++
-            Write-Host "`n=== $counter. $($scan.Name) ===" -ForegroundColor Red
+            Write-Host "`n=== $counter. $($scan.Name) ===" -ForegroundColor Gray
             & $scan.Function
             Start-Sleep -Milliseconds 300
         }
         
-        Write-Host "`n=== All checks completed ===`n" -ForegroundColor Green
+        Write-Host "`n                                                  === All checks completed ===`n" -ForegroundColor Green
         Write-Log "RunAllScans completed for: $url"
-        Write-Host "`nPress Enter to continue..." -ForegroundColor Green
+        Write-Host "`n          Press Enter to continue..." -ForegroundColor Gray
         $null = Read-Host
     }
 
@@ -426,13 +432,13 @@ while ($true) {
         $num = $i + 1
         $spacing = " " * 74
         Write-Host -NoNewline "$spacing["
-        Write-Host -NoNewline (" {0} " -f $num) -ForegroundColor Magenta
+        Write-Host -NoNewline (" {0} " -f $num) -ForegroundColor Cyan
         Write-Host "]   " -NoNewline
         Write-Host "$($menus[$i])" -ForegroundColor Red
         Write-Host ""
     }
 
-    Write-Host "`n `n`n                                                                                                                           Log is being saved to: $logFile" -ForegroundColor Yellow
+    Write-Host "`n `n`n                                                                                                                                 Log is being saved to: $logFile" -ForegroundColor Yellow
     Write-Host "`n"
 
     # === Read-Host em vermelho ===
@@ -443,156 +449,156 @@ while ($true) {
                 Clear-Host
                 Logo_Menu
                     Write-Host ""
-                $url = Show-InputPrompt -input_name "Enter the website URL (e.g., http://scanme.nmap.org)"
+                $url = Show-InputPrompt -input_name "Enter the website URL (ex: http://scanme.nmap.org)"
                 if (Test-ValidUrl $url) {
                     ScanHeaders -url $url
                 } else {
-                    Write-Host "`nInvalid URL. Use http:// or https://" -ForegroundColor Red
+                    Write-Host "`n               Invalid URL. Use http:// or https://" -ForegroundColor Red
                 }
-                Write-Host "`nPress Enter to continue..." -ForegroundColor Red
+                Write-Host "`n               Press Enter to continue..." -ForegroundColor Gray
                 $null = Read-Host
             }
             2 {
                 Clear-Host
                 Logo_Menu
                     Write-Host ""
-                $url = Show-InputPrompt -input_name "Enter the website URL (e.g., http://scanme.nmap.org)"
+                $url = Show-InputPrompt -input_name "Enter the website URL (ex: http://scanme.nmap.org)"
                 if (Test-ValidUrl $url) {
                     ScanOptions -url $url
                 } else {
-                    Write-Host "`nInvalid URL. Use http:// or https://" -ForegroundColor Red
+                    Write-Host "`n               Invalid URL. Use http:// or https://" -ForegroundColor Red
                 }
-                Write-Host "`nPress Enter to continue..." -ForegroundColor Red
+                Write-Host "`n               Press Enter to continue..." -ForegroundColor Gray
                 $null = Read-Host
             }
             3 {
                 Clear-Host
                 Logo_Menu
                     Write-Host ""
-                $url = Show-InputPrompt -input_name "Enter the website URL (e.g., http://scanme.nmap.org)"
+                $url = Show-InputPrompt -input_name "Enter the website URL (ex: http://scanme.nmap.org)"
                 if (Test-ValidUrl $url) {
                     ScanLinks -url $url
                 } else {
-                    Write-Host "`nInvalid URL. Use http:// or https://" -ForegroundColor Red
+                    Write-Host "`n               Invalid URL. Use http:// or https://" -ForegroundColor Red
                 }
-                Write-Host "`nPress Enter to continue..." -ForegroundColor Red
+                Write-Host "`n               Press Enter to continue..." -ForegroundColor Gray
                 $null = Read-Host
             }
             4 {
                 Clear-Host
                 Logo_Menu
                     Write-Host ""
-                $url = Show-InputPrompt -input_name "Enter the website URL (e.g., http://scanme.nmap.org)"
+                $url = Show-InputPrompt -input_name "Enter the website URL (ex: http://scanme.nmap.org)"
                 if (Test-ValidUrl $url) {
                     ScanHTML -url $url
                 } else {
-                    Write-Host "`nInvalid URL. Use http:// or https://" -ForegroundColor Red
+                    Write-Host "`n               Invalid URL. Use http:// or https://" -ForegroundColor Red
                 }
-                Write-Host "`nPress Enter to continue..." -ForegroundColor Red
+                Write-Host "`n               Press Enter to continue..." -ForegroundColor Gray
                 $null = Read-Host
             }
             5 {
                 Clear-Host
                 Logo_Menu
                     Write-Host ""
-                $url = Show-InputPrompt -input_name "Enter the website URL (e.g., http://scanme.nmap.org)"
+                $url = Show-InputPrompt -input_name "Enter the website URL (ex: http://scanme.nmap.org)"
                 if (Test-ValidUrl $url) {
                     ScanTech -url $url
                 } else {
-                    Write-Host "`nInvalid URL. Use http:// or https://" -ForegroundColor Red
+                    Write-Host "`n               Invalid URL. Use http:// or https://" -ForegroundColor Red
                 }
-                Write-Host "`nPress Enter to continue..." -ForegroundColor Red
+                Write-Host "`n               Press Enter to continue..." -ForegroundColor Gray
                 $null = Read-Host
             }
             6 {
                 Clear-Host
                 Logo_Menu
                     Write-Host ""
-                $url = Show-InputPrompt -input_name "Enter the website URL (e.g., http://scanme.nmap.org)"
+                $url = Show-InputPrompt -input_name "Enter the website URL (ex: http://scanme.nmap.org)"
                 if (Test-ValidUrl $url) {
                     ScanStatusCode -url $url
                 } else {
-                    Write-Host "`nInvalid URL. Use http:// or https://" -ForegroundColor Red
+                    Write-Host "`n               Invalid URL. Use http:// or https://" -ForegroundColor Red
                 }
-                Write-Host "`nPress Enter to continue..." -ForegroundColor Red
+                Write-Host "`n               Press Enter to continue..." -ForegroundColor Gray
                 $null = Read-Host
             }
             7 {
                 Clear-Host
                 Logo_Menu
                     Write-Host ""
-                $url = Show-InputPrompt -input_name "Enter the website URL (e.g., http://scanme.nmap.org)"
+                $url = Show-InputPrompt -input_name "Enter the website URL (ex: http://scanme.nmap.org)"
                 if (Test-ValidUrl $url) {
                     ScanTitle -url $url
                 } else {
-                    Write-Host "`nInvalid URL. Use http:// or https://" -ForegroundColor Red
+                    Write-Host "`n               Invalid URL. Use http:// or https://" -ForegroundColor Red
                 }
-                Write-Host "`nPress Enter to continue..." -ForegroundColor Red
+                Write-Host "`n               Press Enter to continue..." -ForegroundColor Gray
                 $null = Read-Host
             }
             8 {
                 Clear-Host
                 Logo_Menu
                     Write-Host ""
-                $url = Show-InputPrompt -input_name "Enter the website URL (e.g., http://scanme.nmap.org)"
+                $url = Show-InputPrompt -input_name "Enter the website URL (ex: http://scanme.nmap.org)"
                 if (Test-ValidUrl $url) {
                     ScanRobotsTxt -url $url
                 } else {
-                    Write-Host "`nInvalid URL. Use http:// or https://" -ForegroundColor Red
+                    Write-Host "`n               Invalid URL. Use http:// or https://" -ForegroundColor Red
                 }
-                Write-Host "`nPress Enter to continue..." -ForegroundColor Red
+                Write-Host "`n               Press Enter to continue..." -ForegroundColor Gray
                 $null = Read-Host
             }
             9 {
                 Clear-Host
                 Logo_Menu
                     Write-Host ""
-                $url = Show-InputPrompt -input_name "Enter the website URL (e.g., http://scanme.nmap.org)"
+                $url = Show-InputPrompt -input_name "Enter the website URL (ex: http://scanme.nmap.org)"
                 if (Test-ValidUrl $url) {
                     ScanSitemap -url $url
                 } else {
-                    Write-Host "`nInvalid URL. Use http:// or https://" -ForegroundColor Red
+                    Write-Host "`n               Invalid URL. Use http:// or https://" -ForegroundColor Red
                 }
-                Write-Host "`nPress Enter to continue..." -ForegroundColor Red
+                Write-Host "`n               Press Enter to continue..." -ForegroundColor Gray
                 $null = Read-Host
             }
             10 {
                 Clear-Host
                 Logo_Menu
                     Write-Host ""
-                $url = Show-InputPrompt -input_name "Enter the website URL (e.g., http://scanme.nmap.org)"
+                $url = Show-InputPrompt -input_name "Enter the website URL (ex: http://scanme.nmap.org)"
                 if (Test-ValidUrl $url) {
                     Get-PortBanner -url $url
                 } else {
-                    Write-Host "`nInvalid URL. Use http:// or https://" -ForegroundColor Red
+                    Write-Host "`n               Invalid URL. Use http:// or https://" -ForegroundColor Red
                 }
-                Write-Host "`nPress Enter to continue..." -ForegroundColor Red
+                Write-Host "`n               Press Enter to continue..." -ForegroundColor Gray
                 $null = Read-Host
-            }
+            } 
             11 {
                     Clear-Host
                     Logo_Menu
                     Write-Host ""
-                $url = Show-InputPrompt -input_name "Enter the website URL (e.g., http://scanme.nmap.org)"
+                $url = Show-InputPrompt -input_name "Enter the website URL (ex: http://scanme.nmap.org)"
                 if (Test-ValidUrl $url) {
                     RunAllScans -url $url
                 } else {
-                    Write-Host "`nInvalid URL. Use http:// or https://" -ForegroundColor Red
-                    Write-Host "`nPress Enter to continue..." -ForegroundColor Red
+                    Write-Host "`n               Invalid URL. Use http:// or https://" -ForegroundColor Red
+                    Write-Host "`n               Press Enter to continue..." -ForegroundColor Gray
                     $null = Read-Host
                 }
             }
             12 {
                 Clear-Host
                 Logo_Menu
-                Write-Host "`n             Thanks For Using PowersDiNSpector`n             Obrigado Por Usar PowersDiNSpector " -ForegroundColor Green
+                Write-Host "             Exiting . . .`n`n`n`n`n             Thanks For Using PowersDiNSpector`n             Obrigado Por Usar PowersDiNSpector " -ForegroundColor Green
                 Write-Host "`n             Powered by PowerShell - Luan Calazans - 2025" -ForegroundColor DarkGray
                 Write-Log "`n`nExiting PowersDiNSpector ...`n`n`n" "INFO"
                 return
             }
             default {
-                Write-Host "`n`nInvalid option. Choose a number between 1 and 12." -ForegroundColor Red
-                Write-Host "`nPress Enter to continue..." -ForegroundColor Green
+                Write-Host "`n`n               Invalid option. Choose a number between 1 and 12." -ForegroundColor Red
+                Write-Host "`n               Press Enter to continue..." -ForegroundColor Gray
                 $null = Read-Host
             }
         }
