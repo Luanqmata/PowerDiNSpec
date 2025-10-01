@@ -403,7 +403,7 @@ function Busca-Por-DNS {
         
         Write-Host "`n                                                  === All checks completed ===`n" -ForegroundColor Green
         Write-Log "RunAllScans completed for: $url"
-        Write-Host "`n          Press Enter to continue..." -ForegroundColor Gray
+        Write-Host "`nPress Enter to continue..." -ForegroundColor Gray
         $null = Read-Host
     }
 
@@ -455,7 +455,7 @@ while ($true) {
                 } else {
                     Write-Host "`n               Invalid URL. Use http:// or https://" -ForegroundColor Red
                 }
-                Write-Host "`n               Press Enter to continue..." -ForegroundColor Gray
+                Write-Host "`nPress Enter to continue..." -ForegroundColor Gray
                 $null = Read-Host
             }
             2 {
@@ -468,7 +468,7 @@ while ($true) {
                 } else {
                     Write-Host "`n               Invalid URL. Use http:// or https://" -ForegroundColor Red
                 }
-                Write-Host "`n               Press Enter to continue..." -ForegroundColor Gray
+                Write-Host "`nPress Enter to continue..." -ForegroundColor Gray
                 $null = Read-Host
             }
             3 {
@@ -481,7 +481,7 @@ while ($true) {
                 } else {
                     Write-Host "`n               Invalid URL. Use http:// or https://" -ForegroundColor Red
                 }
-                Write-Host "`n               Press Enter to continue..." -ForegroundColor Gray
+                Write-Host "`nPress Enter to continue..." -ForegroundColor Gray
                 $null = Read-Host
             }
             4 {
@@ -494,7 +494,7 @@ while ($true) {
                 } else {
                     Write-Host "`n               Invalid URL. Use http:// or https://" -ForegroundColor Red
                 }
-                Write-Host "`n               Press Enter to continue..." -ForegroundColor Gray
+                Write-Host "`nPress Enter to continue..." -ForegroundColor Gray
                 $null = Read-Host
             }
             5 {
@@ -507,7 +507,7 @@ while ($true) {
                 } else {
                     Write-Host "`n               Invalid URL. Use http:// or https://" -ForegroundColor Red
                 }
-                Write-Host "`n               Press Enter to continue..." -ForegroundColor Gray
+                Write-Host "`nPress Enter to continue..." -ForegroundColor Gray
                 $null = Read-Host
             }
             6 {
@@ -520,7 +520,7 @@ while ($true) {
                 } else {
                     Write-Host "`n               Invalid URL. Use http:// or https://" -ForegroundColor Red
                 }
-                Write-Host "`n               Press Enter to continue..." -ForegroundColor Gray
+                Write-Host "`nPress Enter to continue..." -ForegroundColor Gray
                 $null = Read-Host
             }
             7 {
@@ -533,7 +533,7 @@ while ($true) {
                 } else {
                     Write-Host "`n               Invalid URL. Use http:// or https://" -ForegroundColor Red
                 }
-                Write-Host "`n               Press Enter to continue..." -ForegroundColor Gray
+                Write-Host "`nPress Enter to continue..." -ForegroundColor Gray
                 $null = Read-Host
             }
             8 {
@@ -546,7 +546,7 @@ while ($true) {
                 } else {
                     Write-Host "`n               Invalid URL. Use http:// or https://" -ForegroundColor Red
                 }
-                Write-Host "`n               Press Enter to continue..." -ForegroundColor Gray
+                Write-Host "`nPress Enter to continue..." -ForegroundColor Gray
                 $null = Read-Host
             }
             9 {
@@ -559,7 +559,7 @@ while ($true) {
                 } else {
                     Write-Host "`n               Invalid URL. Use http:// or https://" -ForegroundColor Red
                 }
-                Write-Host "`n               Press Enter to continue..." -ForegroundColor Gray
+                Write-Host "`nPress Enter to continue..." -ForegroundColor Gray
                 $null = Read-Host
             }
             10 {
@@ -572,7 +572,7 @@ while ($true) {
                 } else {
                     Write-Host "`n               Invalid URL. Use http:// or https://" -ForegroundColor Red
                 }
-                Write-Host "`n               Press Enter to continue..." -ForegroundColor Gray
+                Write-Host "`nPress Enter to continue..." -ForegroundColor Gray
                 $null = Read-Host
             } 
             11 {
