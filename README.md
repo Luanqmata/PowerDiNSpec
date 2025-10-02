@@ -22,6 +22,7 @@ PowerDiNSpec is a PowerShell-based tool designed to help security enthusiasts an
 * Check for `robots.txt`
 * Check for `sitemap.xml`
 * Check for Banner
+* resolve ip Address 
 * Run all scans automatically
 * Log all actions to a file
 
