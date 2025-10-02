@@ -40,13 +40,13 @@ Always ensure you have authorization before scanning any system and respect the 
 1. Make sure you have **PowerShell 5.1** or later installed on Windows.
 2. Clone or download this repository:
 
-```powershell
+```ruby
 git clone https://github.com/Luanqmata/PowerDiNSpec.git
 ```
 
 3. Navigate to the folder:
 
-```powershell
+```ruby
 cd PowerDiNSpec
 ```
 
@@ -69,7 +69,7 @@ cd PowerDiNSpec
 1. Open PowerShell.
 2. Run the script:
 
-```powershell
+```ruby
 .\PowerDiNSpec.ps1
 ```
 
@@ -84,7 +84,7 @@ cd PowerDiNSpec
 
 Run all scans for a website:
 
-```
+```ruby
 Choose option: 10
 Enter the website URL (e.g., https://example.com)
 ```
