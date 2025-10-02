@@ -80,25 +80,6 @@ function Busca-Por-DNS {
     $logFile = "scan_log_$(Get-Date -Format 'yyyyMMdd_HHmmss').txt"
 
     # === Funções Auxiliares ===
-    function Write-Log {
-        param ([string]$message, [string]$level = "INFO")
-        $timestamp = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
-        $logMessage = "[$timestamp] [$level] $message"
-        Add-Content -Path $logFile -Value $logMessage
-    }
-
-    function Handle-WebError {
-        param ($ErrorObject)
-        if ($ErrorObject.Exception.Response.StatusCode.value__) {
-            $statusCode = $ErrorObject.Exception.Response.StatusCode.value__
-            Write-Host "`nErro HTTP: $statusCode" -ForegroundColor Red
-            Write-Log "Erro HTTP: $statusCode" "ERROR"
-        } else {
-            Write-Host "`nErro: $($ErrorObject.Exception.Message)" -ForegroundColor Red
-            Write-Log "Erro: $($ErrorObject.Exception.Message)" "ERROR"
-        }
-    }
-
     function Test-ValidUrl {
         param ([string]$url)
         try {
@@ -114,21 +95,53 @@ function Busca-Por-DNS {
         
         return Invoke-WebRequest -Uri $Uri -Method $Method -Headers $headers -ErrorAction Stop -TimeoutSec $Timeout
     }
-    
+
+    function Handle-WebError {
+        param ($ErrorObject)
+        if ($ErrorObject.Exception.Response.StatusCode.value__) {
+            $statusCode = $ErrorObject.Exception.Response.StatusCode.value__
+            Write-Host "`nErro HTTP: $statusCode" -ForegroundColor Red
+            Write-Log "Erro HTTP: $statusCode" "ERROR"
+        } else {
+            Write-Host "`nErro: $($ErrorObject.Exception.Message)" -ForegroundColor Red
+            Write-Log "Erro: $($ErrorObject.Exception.Message)" "ERROR"
+        }
+    }
+    function Write-Log {
+        param ([string]$message, [string]$level = "INFO")
+        $timestamp = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
+        $logMessage = "[$timestamp] [$level] $message"
+        Add-Content -Path $logFile -Value $logMessage
+    }
+
     # === Funções de Scan ===
-    function ScanHeaders {
+    function ScanStatusCode {
+        param ([String]$url)
+        try {
+            Write-Host "`n Obtaining HTTP status code..." -ForegroundColor Yellow
+            Write-Log "Starting ScanStatusCode for: $url"
+            $response = Invoke-WebRequestSafe -Uri $url
+            Write-Host "`nStatus Code:" -ForegroundColor Green
+            $response.StatusCode
+            Write-Log "Status Code: $($response.StatusCode)"
+        } catch {
+            Handle-WebError -ErrorObject $_
+        }
+    }
+    
+    function ScanTitle {
         param ([string]$url)
         try {
-            Write-Host "`n Scanning Headers..." -ForegroundColor Yellow
-            Write-Log "Starting ScanHeaders for: $url"
-
-            $response = Invoke-WebRequestSafe -Uri $url -Method Head
-            Write-Host "`n The server is running:" -ForegroundColor Green
-            if ($response.Headers.Server) {
-                $response.Headers.Server
-                Write-Log "Server header: $($response.Headers.Server)"
+            Write-Host "`n Obtaining page title..." -ForegroundColor Yellow
+            Write-Log "Starting ScanTitle for: $url"
+            
+            $response = Invoke-WebRequestSafe -Uri $url
+            if ($response -and $response.ParsedHtml -and $response.ParsedHtml.title) {
+                Write-Host "`nPage title:" -ForegroundColor Green
+                $response.ParsedHtml.title
+                Write-Log "Page title: $($response.ParsedHtml.title)"
             } else {
-                Write-Host "Server header not found." -ForegroundColor Red
+                Write-Host "`nNo title found." -ForegroundColor Red
             }
         } catch {
             Handle-WebError -ErrorObject $_
@@ -148,6 +161,56 @@ function Busca-Por-DNS {
                 Write-Log "Allowed methods: $($response.Headers.Allow)"
             } else {
                 Write-Host "No Allow header found in the response." -ForegroundColor Red
+            }
+        } catch {
+            Handle-WebError -ErrorObject $_
+        }
+    }
+
+    function ScanHeaders {
+        param ([string]$url)
+        try {
+            Write-Host "`n Scanning Headers..." -ForegroundColor Yellow
+            Write-Log "Starting ScanHeaders for: $url"
+
+            $response = Invoke-WebRequestSafe -Uri $url -Method Head
+            Write-Host "`n The server is running:" -ForegroundColor Green
+            if ($response.Headers.Server) {
+                $response.Headers.Server
+                Write-Log "Server header: $($response.Headers.Server)"
+            } else {
+                Write-Host "Server header not found." -ForegroundColor Red
+            }
+        } catch {
+            Handle-WebError -ErrorObject $_
+        }
+    }
+
+    function ScanTech {
+        param ([string]$url)
+        try {
+            Write-Host "`n Detecting technologies in use..." -ForegroundColor Yellow
+            Write-Log "Starting ScanTech for: $url"
+
+            $response = Invoke-WebRequestSafe -Uri $url
+            $techDetected = $false
+
+            if ($response.Headers["x-powered-by"]) {
+                Write-Host "`nTechnology detected (X-Powered-By):" -ForegroundColor Green
+                $response.Headers["x-powered-by"]
+                Write-Log "Technology detected (X-Powered-By): $($response.Headers['x-powered-by'])"
+                $techDetected = $true
+            }
+
+            if ($response.Headers["server"]) {
+                Write-Host "`nServer detected:" -ForegroundColor Green
+                $response.Headers["server"]
+                Write-Log "Server detected: $($response.Headers['server'])"
+                $techDetected = $true
+            }
+
+            if (-not $techDetected) {
+                Write-Host "No technologies detected in the headers." -ForegroundColor Red
             }
         } catch {
             Handle-WebError -ErrorObject $_
@@ -176,6 +239,84 @@ function Busca-Por-DNS {
         }
     }
 
+    function ScanRobotsTxt {
+        param ([string]$url)
+        try {
+            Write-Host "`n Looking for robots.txt..." -ForegroundColor Yellow
+            Write-Log "Starting ScanRobotsTxt for: $url"
+            
+            $robotsUrl = "$url/robots.txt"
+            $response = Invoke-WebRequestSafe -Uri $robotsUrl
+            Write-Host "`n Content robots.txt:" -ForegroundColor Green
+            Write-Host $response.Content
+            Write-Log "Robots.txt found and successfully read"
+        } catch {
+            Write-Host "`nRobots.txt not found or access error." -ForegroundColor Red
+            Write-Log "Robots.txt not found: $($_.Exception.Message)" "WARNING"
+        }
+    }
+
+    function ScanSitemap {
+        param ([string]$url)
+        try {
+            Write-Host "`n Checking sitemap.xml..." -ForegroundColor Yellow
+            Write-Log "Starting ScanSitemap for: $url"
+            
+            $sitemapUrl = "$url/sitemap.xml"
+            $response = Invoke-WebRequestSafe -Uri $sitemapUrl
+            Write-Host "`n Sitemap found:" -ForegroundColor Green
+            Write-Host $response.Content.Substring(0, [Math]::Min($response.Content.Length, 500))
+            Write-Log "Sitemap.xml found and successfully read"
+        } catch {
+            Write-Host "`nSitemap.xml not found or access error." -ForegroundColor Red
+            Write-Log "Sitemap.xml not found: $($_.Exception.Message)" "WARNING"
+        }
+    }
+
+    function Get-PortBanner {
+        param (
+            [string]$url,
+            [int[]]$Ports = @(21,22,23,25,80,110,143,443,3389,8080)
+        )
+
+        Write-Host "`n Checking Port Banner's ... `n" -ForegroundColor Yellow
+        Write-Log "Starting Get-PortBanner" "INFO"
+        $uri = [System.Uri]$url
+        $CleanHost = $uri.Host
+        
+        foreach ($Port in $Ports) {
+            try {
+                $client = New-Object System.Net.Sockets.TcpClient
+                $client.ReceiveTimeout = 3000
+                $client.SendTimeout = 3000
+                $client.Connect($CleanHost, $Port)
+
+                if ($client.Connected) {
+                    $stream = $client.GetStream()
+                    $buffer = New-Object Byte[] 1024
+                    Start-Sleep -Milliseconds 500
+
+                    $read = $stream.Read($buffer, 0, 1024)
+                    $response = [System.Text.Encoding]::ASCII.GetString($buffer, 0, $read)
+
+                    if ($response) {
+                        Write-Host "[${CleanHost}:${Port}] Banner Found:$response" -ForegroundColor Green
+                        Write-Log "Banner found on ${CleanHost}:${Port} - $response"
+                    } else {
+                        Write-Host "[${CleanHost}:${Port}] Sem banner visível" -ForegroundColor Yellow
+                        Write-Log "No banner visible on ${CleanHost}:${Port}" "INFO"
+                    }
+                    $stream.Close()
+                    $client.Close()
+                }
+            }
+            catch {
+                Write-Host "[${CleanHost}:${Port}] Erro: No Connection Established" -ForegroundColor Red # Erro: $_
+                Write-Log "No connection to ${CleanHost}:${Port} - $($_.Exception.Message)" "WARNING"
+            }
+        }
+    }
+    
     function ScanHTML {
         param ([string]$url)
         try {
@@ -232,148 +373,6 @@ function Busca-Por-DNS {
         }
     }
 
-    function ScanTech {
-        param ([string]$url)
-        try {
-            Write-Host "`n Detecting technologies in use..." -ForegroundColor Yellow
-            Write-Log "Starting ScanTech for: $url"
-
-            $response = Invoke-WebRequestSafe -Uri $url
-            $techDetected = $false
-
-            if ($response.Headers["x-powered-by"]) {
-                Write-Host "`nTechnology detected (X-Powered-By):" -ForegroundColor Green
-                $response.Headers["x-powered-by"]
-                Write-Log "Technology detected (X-Powered-By): $($response.Headers['x-powered-by'])"
-                $techDetected = $true
-            }
-
-            if ($response.Headers["server"]) {
-                Write-Host "`nServer detected:" -ForegroundColor Green
-                $response.Headers["server"]
-                Write-Log "Server detected: $($response.Headers['server'])"
-                $techDetected = $true
-            }
-
-            if (-not $techDetected) {
-                Write-Host "No technologies detected in the headers." -ForegroundColor Red
-            }
-        } catch {
-            Handle-WebError -ErrorObject $_
-        }
-    }
-
-    function ScanStatusCode {
-        param ([String]$url)
-        try {
-            Write-Host "`n Obtaining HTTP status code..." -ForegroundColor Yellow
-            Write-Log "Starting ScanStatusCode for: $url"
-            $response = Invoke-WebRequestSafe -Uri $url
-            Write-Host "`nStatus Code:" -ForegroundColor Green
-            $response.StatusCode
-            Write-Log "Status Code: $($response.StatusCode)"
-        } catch {
-            Handle-WebError -ErrorObject $_
-        }
-    }
-
-    function ScanTitle {
-        param ([string]$url)
-        try {
-            Write-Host "`n Obtaining page title..." -ForegroundColor Yellow
-            Write-Log "Starting ScanTitle for: $url"
-            
-            $response = Invoke-WebRequestSafe -Uri $url
-            if ($response -and $response.ParsedHtml -and $response.ParsedHtml.title) {
-                Write-Host "`nPage title:" -ForegroundColor Green
-                $response.ParsedHtml.title
-                Write-Log "Page title: $($response.ParsedHtml.title)"
-            } else {
-                Write-Host "`nNo title found." -ForegroundColor Red
-            }
-        } catch {
-            Handle-WebError -ErrorObject $_
-        }
-    }
-
-    function ScanRobotsTxt {
-        param ([string]$url)
-        try {
-            Write-Host "`n Looking for robots.txt..." -ForegroundColor Yellow
-            Write-Log "Starting ScanRobotsTxt for: $url"
-            
-            $robotsUrl = "$url/robots.txt"
-            $response = Invoke-WebRequestSafe -Uri $robotsUrl
-            Write-Host "`n Content robots.txt:" -ForegroundColor Green
-            Write-Host $response.Content
-            Write-Log "Robots.txt found and successfully read"
-        } catch {
-            Write-Host "`nRobots.txt not found or access error." -ForegroundColor Red
-            Write-Log "Robots.txt not found: $($_.Exception.Message)" "WARNING"
-        }
-    }
-
-    function ScanSitemap {
-        param ([string]$url)
-        try {
-            Write-Host "`n Checking sitemap.xml..." -ForegroundColor Yellow
-            Write-Log "Starting ScanSitemap for: $url"
-            
-            $sitemapUrl = "$url/sitemap.xml"
-            $response = Invoke-WebRequestSafe -Uri $sitemapUrl
-            Write-Host "`n Sitemap found:" -ForegroundColor Green
-            Write-Host $response.Content.Substring(0, [Math]::Min($response.Content.Length, 500))
-            Write-Log "Sitemap.xml found and successfully read"
-        } catch {
-            Write-Host "`nSitemap.xml not found or access error." -ForegroundColor Red
-            Write-Log "Sitemap.xml not found: $($_.Exception.Message)" "WARNING"
-        }
-    }
-    
-    function Get-PortBanner {
-        param (
-            [string]$url,
-            [int[]]$Ports = @(21,22,23,25,80,110,143,443,3389,8080)
-        )
-
-        Write-Host "`n Checking Port Banner's ... `n" -ForegroundColor Yellow
-        Write-Log "Starting Get-PortBanner" "INFO"
-        $uri = [System.Uri]$url
-        $CleanHost = $uri.Host
-        
-        foreach ($Port in $Ports) {
-            try {
-                $client = New-Object System.Net.Sockets.TcpClient
-                $client.ReceiveTimeout = 3000
-                $client.SendTimeout = 3000
-                $client.Connect($CleanHost, $Port)
-
-                if ($client.Connected) {
-                    $stream = $client.GetStream()
-                    $buffer = New-Object Byte[] 1024
-                    Start-Sleep -Milliseconds 500
-
-                    $read = $stream.Read($buffer, 0, 1024)
-                    $response = [System.Text.Encoding]::ASCII.GetString($buffer, 0, $read)
-
-                    if ($response) {
-                        Write-Host "[${CleanHost}:${Port}] Banner Found:$response" -ForegroundColor Green
-                        Write-Log "Banner found on ${CleanHost}:${Port} - $response"
-                    } else {
-                        Write-Host "[${CleanHost}:${Port}] Sem banner visível" -ForegroundColor Yellow
-                        Write-Log "No banner visible on ${CleanHost}:${Port}" "INFO"
-                    }
-                    $stream.Close()
-                    $client.Close()
-                }
-            }
-            catch {
-                Write-Host "[${CleanHost}:${Port}] Erro: No Connection Established" -ForegroundColor Red # Erro: $_
-                Write-Log "No connection to ${CleanHost}:${Port} - $($_.Exception.Message)" "WARNING"
-            }
-        }
-    }
-
     function RunAllScans {
         param ([string]$url)
         clear-host
@@ -416,16 +415,16 @@ while ($true) {
 
     $menus = @(
         "Help & Customization",
-        "Capture Server Headers",
-        "Discover Allowed HTTP Methods",
-        "List Links Found in HTML",
-        "Get All Words from the Site",
-        "Detect Technologies in Use",
         "Get HTTP Status Code",
         "Get the Page <title>",
+        "Discover Allowed HTTP Methods",
+        "Capture Server Headers",
+        "Detect Technologies in Use",
+        "List Links Found in HTML",
         "Check the robots.txt File",
         "Check if Site has a Sitemap",
         "Capture Port's Banner's",
+        "Get All Words from the Site",
         "Run All Scans (1 to 10)",
         "Exit"
     )
@@ -562,18 +561,6 @@ while ($true) {
                             Write-Host "    - Unlock script execution if required (adjust ExecutionPolicy as needed)." -ForegroundColor White
                             Write-Host "    - Ensure network connectivity and DNS resolution for the target hosts." -ForegroundColor White
 
-                            Write-Host "`n  BASIC USAGE" -ForegroundColor Cyan
-                            Write-Host "    1) Open PowerShell." -ForegroundColor White
-                            Write-Host "    2) Navigate to the PowerDiNSpec folder." -ForegroundColor White
-                            Write-Host "    3) Run: .\\PowerDiNSpec.ps1" -ForegroundColor White
-                            Write-Host "    4) The interactive menu will appear. Select an option (1-12) to run a" -ForegroundColor White
-                            Write-Host "       specific check or choose the aggregated scan to run all checks." -ForegroundColor White
-                            Write-Host "    5) When prompted, enter the target URL (include http:// or https://)." -ForegroundColor White
-                            Write-Host "    6) Results will be displayed in the console and saved to a log file." -ForegroundColor White
-                            Write-Host ""
-                            Write-Host "    Note: The tool expects well-formed URLs. If a URL fails, verify the" -ForegroundColor White
-                            Write-Host "    scheme (http or https), host and connectivity." -ForegroundColor White
-
                             Write-Host "`n  EXAMPLE: RUNNING ALL SCANS" -ForegroundColor Cyan
                             Write-Host "    - From the main menu choose the option that runs all scans (Run All)." -ForegroundColor White
                             Write-Host "    - Enter the target URL when requested (for example: https://example.com)." -ForegroundColor White
@@ -643,7 +630,7 @@ while ($true) {
                     Write-Host ""
                 $url = Show-InputPrompt -input_name "Enter the website URL (ex: http://scanme.nmap.org)"
                 if (Test-ValidUrl $url) {
-                    ScanHeaders -url $url
+                    ScanStatusCode -url $url
                 } else {
                     Write-Host "`n               Invalid URL. Use http:// or https://" -ForegroundColor Red
                 }
@@ -656,7 +643,7 @@ while ($true) {
                     Write-Host ""
                 $url = Show-InputPrompt -input_name "Enter the website URL (ex: http://scanme.nmap.org)"
                 if (Test-ValidUrl $url) {
-                    ScanOptions -url $url
+                    ScanTitle -url $url
                 } else {
                     Write-Host "`n               Invalid URL. Use http:// or https://" -ForegroundColor Red
                 }
@@ -669,7 +656,7 @@ while ($true) {
                     Write-Host ""
                 $url = Show-InputPrompt -input_name "Enter the website URL (ex: http://scanme.nmap.org)"
                 if (Test-ValidUrl $url) {
-                    ScanLinks -url $url
+                    ScanOptions -url $url
                 } else {
                     Write-Host "`n               Invalid URL. Use http:// or https://" -ForegroundColor Red
                 }
@@ -682,7 +669,7 @@ while ($true) {
                     Write-Host ""
                 $url = Show-InputPrompt -input_name "Enter the website URL (ex: http://scanme.nmap.org)"
                 if (Test-ValidUrl $url) {
-                    ScanHTML -url $url
+                    ScanHeaders -url $url
                 } else {
                     Write-Host "`n               Invalid URL. Use http:// or https://" -ForegroundColor Red
                 }
@@ -708,7 +695,7 @@ while ($true) {
                     Write-Host ""
                 $url = Show-InputPrompt -input_name "Enter the website URL (ex: http://scanme.nmap.org)"
                 if (Test-ValidUrl $url) {
-                    ScanStatusCode -url $url
+                    ScanLinks -url $url
                 } else {
                     Write-Host "`n               Invalid URL. Use http:// or https://" -ForegroundColor Red
                 }
@@ -721,7 +708,7 @@ while ($true) {
                     Write-Host ""
                 $url = Show-InputPrompt -input_name "Enter the website URL (ex: http://scanme.nmap.org)"
                 if (Test-ValidUrl $url) {
-                    ScanTitle -url $url
+                    ScanRobotsTxt -url $url
                 } else {
                     Write-Host "`n               Invalid URL. Use http:// or https://" -ForegroundColor Red
                 }
@@ -734,7 +721,7 @@ while ($true) {
                     Write-Host ""
                 $url = Show-InputPrompt -input_name "Enter the website URL (ex: http://scanme.nmap.org)"
                 if (Test-ValidUrl $url) {
-                    ScanRobotsTxt -url $url
+                    ScanSitemap -url $url
                 } else {
                     Write-Host "`n               Invalid URL. Use http:// or https://" -ForegroundColor Red
                 }
@@ -747,7 +734,7 @@ while ($true) {
                     Write-Host ""
                 $url = Show-InputPrompt -input_name "Enter the website URL (ex: http://scanme.nmap.org)"
                 if (Test-ValidUrl $url) {
-                    ScanSitemap -url $url
+                    Get-PortBanner -url $url
                 } else {
                     Write-Host "`n               Invalid URL. Use http:// or https://" -ForegroundColor Red
                 }
@@ -760,7 +747,7 @@ while ($true) {
                     Write-Host ""
                 $url = Show-InputPrompt -input_name "Enter the website URL (ex: http://scanme.nmap.org)"
                 if (Test-ValidUrl $url) {
-                    Get-PortBanner -url $url
+                    ScanHTML -url $url
                 } else {
                     Write-Host "`n               Invalid URL. Use http:// or https://" -ForegroundColor Red
                 }
