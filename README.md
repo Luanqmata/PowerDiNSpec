@@ -57,6 +57,11 @@ cd PowerDiNSpec
   <img width="367" height="513" alt="screenshot2" src="https://github.com/user-attachments/assets/ed6b684e-e6a9-458f-a9d0-f9dc8abb84a2" />
 </p>
 
+5. unlock 4 win 11 - (type to unlock)
+```ruby
+    Set-ExecutionPolicy -ExecutionPolicy Unrestricted -Scope Process
+```
+
 ---
 
 ## Usage
