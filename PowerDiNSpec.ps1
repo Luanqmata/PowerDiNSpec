@@ -63,7 +63,6 @@ function Show-InputPrompt {
     Write-Host " > " -NoNewline -ForegroundColor Red
     Write-Host "@: " -NoNewline -ForegroundColor White
 
-    # Entrada do usuário em magenta
     $origColor = [Console]::ForegroundColor
     [Console]::ForegroundColor = "Magenta"
     $option = Read-Host
@@ -145,6 +144,35 @@ function Busca-Por-DNS {
             }
         } catch {
             Handle-WebError -ErrorObject $_
+        }
+    }
+
+    function Get-ip-from-url {
+        param (
+            [Parameter(Mandatory=$true)]
+            [String]$url
+        )
+
+        try {
+            Write-Host "`n Searching for IP DNS ..." -ForegroundColor Yellow
+            Write-Log "Starting Get-ip-from-url for: $url"
+
+            $domain = ($url -replace '^https?://', '') -replace '/.*$', ''
+            
+            $results = Resolve-DnsName -Name $domain -Type A -ErrorAction Stop
+            
+            Write-Host "`nIP Address(es):" -ForegroundColor Green
+            $results | ForEach-Object { 
+                Write-Host "$($_.IPAddress)" -ForegroundColor White
+            }
+
+            Write-Log "Successfully resolved $domain to: $($results.IPAddress -join ', ')"
+        }
+        catch {
+            Write-Host "`nErro ao resolver DNS para: $url" -ForegroundColor Red
+            Write-Host "Detalhes: $($_.Exception.Message)" -ForegroundColor DarkRed
+            Write-Log "DNS Resolution Error for $url : $($_.Exception.Message)" "ERROR"
+            
         }
     }
 
@@ -383,6 +411,7 @@ function Busca-Por-DNS {
         $scans = @(
             @{Name="HTTP Status Code"; Function={ScanStatusCode -url $url}},
             @{Name="Page Title"; Function={ScanTitle -url $url}},
+            @{Name="IP Address from DNS"; Function={Get-ip-from-url -url $url}},
             @{Name="Allowed HTTP Methods"; Function={ScanOptions -url $url}},
             @{Name="Server Headers"; Function={ScanHeaders -url $url}}, 
             @{Name="Technologies in Use"; Function={ScanTech -url $url}},
@@ -417,6 +446,7 @@ while ($true) {
         "Help & Customization",
         "Get HTTP Status Code",
         "Get the Page <title>",
+        "Get IP Address from DNS",
         "Discover Allowed HTTP Methods",
         "Capture Server Headers",
         "Detect Technologies in Use",
@@ -443,7 +473,7 @@ while ($true) {
     Write-Host "`n"
 
     # === Read-Host em vermelho ===
-    $option = Show-InputPrompt -input_name "Choose an option (1-12)"
+    $option = Show-InputPrompt -input_name "Choose an option (1-13)"
 
         switch ($option) {
             0 {
@@ -650,13 +680,13 @@ while ($true) {
                 Write-Host "`nPress Enter to continue..." -ForegroundColor Gray
                 $null = Read-Host
             }
-            3 {
+            3 {   
                 Clear-Host
                 Logo_Menu
-                    Write-Host ""
+                Write-Host ""
                 $url = Show-InputPrompt -input_name "Enter the website URL (ex: http://scanme.nmap.org)"
                 if (Test-ValidUrl $url) {
-                    ScanOptions -url $url
+                    Get-ip-from-url -url $url
                 } else {
                     Write-Host "`n               Invalid URL. Use http:// or https://" -ForegroundColor Red
                 }
@@ -669,7 +699,7 @@ while ($true) {
                     Write-Host ""
                 $url = Show-InputPrompt -input_name "Enter the website URL (ex: http://scanme.nmap.org)"
                 if (Test-ValidUrl $url) {
-                    ScanHeaders -url $url
+                    ScanOptions -url $url
                 } else {
                     Write-Host "`n               Invalid URL. Use http:// or https://" -ForegroundColor Red
                 }
@@ -682,7 +712,7 @@ while ($true) {
                     Write-Host ""
                 $url = Show-InputPrompt -input_name "Enter the website URL (ex: http://scanme.nmap.org)"
                 if (Test-ValidUrl $url) {
-                    ScanTech -url $url
+                    ScanHeaders -url $url
                 } else {
                     Write-Host "`n               Invalid URL. Use http:// or https://" -ForegroundColor Red
                 }
@@ -695,7 +725,7 @@ while ($true) {
                     Write-Host ""
                 $url = Show-InputPrompt -input_name "Enter the website URL (ex: http://scanme.nmap.org)"
                 if (Test-ValidUrl $url) {
-                    ScanLinks -url $url
+                    ScanTech -url $url
                 } else {
                     Write-Host "`n               Invalid URL. Use http:// or https://" -ForegroundColor Red
                 }
@@ -708,7 +738,7 @@ while ($true) {
                     Write-Host ""
                 $url = Show-InputPrompt -input_name "Enter the website URL (ex: http://scanme.nmap.org)"
                 if (Test-ValidUrl $url) {
-                    ScanRobotsTxt -url $url
+                    ScanLinks -url $url
                 } else {
                     Write-Host "`n               Invalid URL. Use http:// or https://" -ForegroundColor Red
                 }
@@ -721,7 +751,7 @@ while ($true) {
                     Write-Host ""
                 $url = Show-InputPrompt -input_name "Enter the website URL (ex: http://scanme.nmap.org)"
                 if (Test-ValidUrl $url) {
-                    ScanSitemap -url $url
+                    ScanRobotsTxt -url $url
                 } else {
                     Write-Host "`n               Invalid URL. Use http:// or https://" -ForegroundColor Red
                 }
@@ -734,7 +764,7 @@ while ($true) {
                     Write-Host ""
                 $url = Show-InputPrompt -input_name "Enter the website URL (ex: http://scanme.nmap.org)"
                 if (Test-ValidUrl $url) {
-                    Get-PortBanner -url $url
+                    ScanSitemap -url $url
                 } else {
                     Write-Host "`n               Invalid URL. Use http:// or https://" -ForegroundColor Red
                 }
@@ -747,14 +777,27 @@ while ($true) {
                     Write-Host ""
                 $url = Show-InputPrompt -input_name "Enter the website URL (ex: http://scanme.nmap.org)"
                 if (Test-ValidUrl $url) {
-                    ScanHTML -url $url
+                    Get-PortBanner -url $url
                 } else {
                     Write-Host "`n               Invalid URL. Use http:// or https://" -ForegroundColor Red
                 }
                 Write-Host "`nPress Enter to continue..." -ForegroundColor Gray
                 $null = Read-Host
-            } 
+            }
             11 {
+                Clear-Host
+                Logo_Menu
+                    Write-Host ""
+                $url = Show-InputPrompt -input_name "Enter the website URL (ex: http://scanme.nmap.org)"
+                if (Test-ValidUrl $url) {
+                    ScanHTML -url $url
+                } else {
+                    Write-Host "`n               Invalid URL. Use http:// or https://" -ForegroundColor Red 
+                }
+                Write-Host "`nPress Enter to continue..." -ForegroundColor Gray
+                $null = Read-Host
+            } 
+            12 {
                     Clear-Host
                     Logo_Menu
                     Write-Host ""
@@ -767,7 +810,7 @@ while ($true) {
                     $null = Read-Host
                 }
             }
-            12 {
+            13 {
                 Clear-Host
                 Logo_Menu
 
@@ -789,7 +832,7 @@ while ($true) {
                 return
             }
             default {
-                Write-Host "`n`n               Invalid option. Choose a number between 1 and 12." -ForegroundColor Red
+                Write-Host "`n`n               Invalid option. Choose a number between 1 and 13." -ForegroundColor Red
                 Write-Host "`n               Press Enter to continue..." -ForegroundColor Gray
                 $null = Read-Host
             }
