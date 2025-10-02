@@ -74,7 +74,7 @@ cd PowerDiNSpec
 .\PowerDiNSpec.ps1
 ```
 
-3. The menu will appear. Choose an option (1-12) to perform the desired scan.
+3. The menu will appear. Choose an option (1-13) to perform the desired scan.
 4. Enter the target URL or host when prompted.
 5. Logs will be automatically saved in the script directory with timestamps.
 6. Press Enter to return to the menu after each scan.
