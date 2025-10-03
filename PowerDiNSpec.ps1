@@ -30,7 +30,7 @@ function Logo_Menu {
                                     |_  ..  _|   | |_) |/ _//\\ \ /\ / // _ \| '__|  | | | || || | | |/ __|   | |_) |/  _ \ / __|     / /
                                     |_      _|   | .__/| (//) |\ V  V /|  __/| |     | |_/ || || | | |\__ \   | .__/|  ___/| (__     |_|
                                       |_||_|     |_|    \//__/  \_/\_/  \___||_|     |____/ |_||_| |_||___/   |_|    \____| \___|
-                                                        //               | |                (_)        |_|                           (_)           1.9.7v
+                                                        //               | |                (_)        |_|                           (_)           2.0.0v
 
                                          
 "@ -split "`n"
@@ -146,7 +146,6 @@ function Busca-Por-DNS {
             Handle-WebError -ErrorObject $_
         }
     }
-
     function Get-ip-from-url {
         param (
             [Parameter(Mandatory=$true)]
@@ -154,25 +153,40 @@ function Busca-Por-DNS {
         )
 
         try {
-            Write-Host "`n Searching for IP DNS ..." -ForegroundColor Yellow
+            Write-Host "`n Searching for IP's DNS ..." -ForegroundColor Yellow
             Write-Log "Starting Get-ip-from-url for: $url"
 
             $domain = ($url -replace '^https?://', '') -replace '/.*$', ''
+
+            $results = Resolve-DnsName -Name $domain -ErrorAction Stop
             
-            $results = Resolve-DnsName -Name $domain -Type A -ErrorAction Stop
+            Write-Host "`nIPv4 Address:" -ForegroundColor Green
+            $ipv4 = $results | Where-Object { $_.Type -eq 'A' }
+            if ($ipv4) {
+                $ipv4 | ForEach-Object { 
+                    Write-Host "  $($_.IPAddress)" -ForegroundColor White
+                    #Write-Host "  Domain: $domain" -ForegroundColor White
+                }
+            } else {
+                Write-Host "  Nenhum IPv4 encontrado" -ForegroundColor Red
+            }
             
-            Write-Host "`nIP Address(es):" -ForegroundColor Green
-            $results | ForEach-Object { 
-                Write-Host "$($_.IPAddress)" -ForegroundColor White
+            Write-Host "`nIPv6 Address:" -ForegroundColor Green
+            $ipv6 = $results | Where-Object { $_.Type -eq 'AAAA' }
+            if ($ipv6) {
+                $ipv6 | ForEach-Object { 
+                    Write-Host "  $($_.IPAddress)" -ForegroundColor White
+                }
+            } else {
+                Write-Host "  Nenhum IPv6 encontrado" -ForegroundColor Red
             }
 
-            Write-Log "Successfully resolved $domain to: $($results.IPAddress -join ', ')"
+            Write-Log "Successfully resolved $domain - IPv4: $($ipv4.IPAddress -join ', ') IPv6: $($ipv6.IPAddress -join ', ')"
         }
         catch {
             Write-Host "`nErro ao resolver DNS para: $url" -ForegroundColor Red
             Write-Host "Detalhes: $($_.Exception.Message)" -ForegroundColor DarkRed
             Write-Log "DNS Resolution Error for $url : $($_.Exception.Message)" "ERROR"
-            
         }
     }
 
@@ -245,6 +259,146 @@ function Busca-Por-DNS {
         }
     }
 
+    function Get-DNSRecords {
+        param([string]$url)
+
+        $domain = ($url -replace '^https?://', '') -replace '/.*$', ''
+
+        Write-Host "`n Checking DNS records..." -ForegroundColor Yellow
+        Write-Log "Starting DNS records check for: $domain" "INFO"
+
+        try {
+            Write-Log "Looking for MX records for: $domain" "INFO"
+            $mx = Resolve-DnsName -Name $domain -Type MX -ErrorAction Stop
+            if ($mx) {
+                Write-Host "`n  MX Records:" -ForegroundColor Yellow
+                $mx | ForEach-Object { 
+                    Write-Host "  $($_.NameExchange) (Pref: $($_.Preference))"
+                }
+                Write-Log "MX records found for: $domain" "INFO"
+            }
+        }
+        catch {
+            Write-Host "    No MX records found" -ForegroundColor Red
+            Write-Log "No MX records found for: $domain" "WARNING"
+        }
+
+        try {
+            Write-Log "Looking for NS records for: $domain" "INFO"
+            $ns = Resolve-DnsName -Name $domain -Type NS -ErrorAction Stop
+            if ($ns) {
+                Write-Host "`n  NS Records:" -ForegroundColor Magenta
+                $ns | ForEach-Object { 
+                    Write-Host "  $($_.NameHost)"
+                }
+                Write-Log "NS records found for: $domain" "INFO"
+            }
+        }
+        catch {
+            Write-Host "    No NS records found" -ForegroundColor Red
+            Write-Log "No NS records found for: $domain" "WARNING"
+        }
+
+        try {
+            Write-Log "Looking for SOA records for: $domain" "INFO"
+            $soa = Resolve-DnsName -Name $domain -Type SOA -ErrorAction Stop
+            if ($soa) {
+                Write-Host "`n  SOA Record:" -ForegroundColor DarkYellow
+                $soa | ForEach-Object { 
+                    Write-Host "    Primary Server: $($_.PrimaryServer)"
+                    Write-Host "    Admin: $($_.NameAdministrator)"
+                    Write-Host "    Serial: $($_.SerialNumber)"
+                }
+                Write-Log "SOA record found for: $domain" "INFO"
+            }
+        }
+        catch {
+            Write-Host "    No SOA record found" -ForegroundColor Red
+            Write-Log "No SOA record found for: $domain" "WARNING"
+        }
+
+        try {
+            Write-Log "Looking for CNAME records for: $domain" "INFO"
+            $cname = Resolve-DnsName -Name $domain -Type CNAME -ErrorAction Stop
+            if ($cname) {
+                Write-Host "`n  CNAME Record:" -ForegroundColor DarkGreen
+                $cname | ForEach-Object { 
+                    Write-Host "    $($_.NameAlias) -> $($_.NameHost)"
+                }
+                Write-Log "CNAME records found for: $domain" "INFO"
+            }
+        }
+        catch {
+            Write-Host "    No CNAME records found" -ForegroundColor Red
+            Write-Log "No CNAME records found for: $domain" "WARNING"
+        }
+
+        try {
+            Write-Log "Looking for TXT records for: $domain" "INFO"
+            $txt = Resolve-DnsName -Name $domain -Type TXT -ErrorAction Stop
+            if ($txt) {
+                Write-Host "`n  TXT Records:" -ForegroundColor DarkCyan
+                $txt | ForEach-Object { 
+                    Write-Host "    $($_.Strings -join '; ')"
+                }
+                Write-Log "TXT records found for: $domain" "INFO"
+            }
+        }
+        catch {
+            Write-Host "    No TXT records found" -ForegroundColor Red
+            Write-Log "No TXT records found for: $domain" "WARNING"
+        }
+
+        Write-Log "Starting reverse lookup (PTR) for: $domain" "INFO"
+        $ips = @()
+
+        try {
+            $a = Resolve-DnsName -Name $domain -Type A -ErrorAction SilentlyContinue
+            if ($a) { 
+                $ips += $a.IPAddress
+                Write-Log "A records found for: $domain" "INFO"
+            }
+        }
+        catch {
+            Write-Log "Failed to get A records for: $domain" "WARNING"
+        }
+
+        try {
+            $aaaa = Resolve-DnsName -Name $domain -Type AAAA -ErrorAction SilentlyContinue
+            if ($aaaa) { 
+                $ips += $aaaa.IPAddress
+                Write-Log "AAAA records found for: $domain" "INFO"
+            }
+        }
+        catch {
+            Write-Log "Failed to get AAAA records for: $domain" "WARNING"
+        }
+
+        if ($ips.Count -gt 0) {
+            Write-Host "`n  Reverse Lookup (PTR):" -ForegroundColor Cyan
+            Write-Log "Starting PTR lookups for $($ips.Count) IP addresses" "INFO"
+            
+            foreach ($ip in $ips) {
+                try {
+                    $hostEntry = [System.Net.Dns]::GetHostEntry($ip)
+                    Write-Host "    $ip -> $($hostEntry.HostName)"
+                    Write-Log "PTR found for $ip : $($hostEntry.HostName)" "INFO"
+                }
+                catch {
+                    Write-Host "    $ip -> PTR not found" -ForegroundColor DarkYellow
+                    Write-Log "PTR not found for: $ip" "WARNING"
+                }
+            }
+        }
+        else {
+            Write-Host "`n  No IP addresses found for reverse lookup." -ForegroundColor DarkYellow
+            Write-Log "No A or AAAA records found for reverse lookup: $domain" "INFO"
+        }
+
+        Write-Log "DNS records check completed for: $domain" "INFO"
+    }
+
+
     function ScanLinks {
         param ([string]$url)
         try {
@@ -304,7 +458,7 @@ function Busca-Por-DNS {
     function Get-PortBanner {
         param (
             [string]$url,
-            [int[]]$Ports = @(21,22,23,25,80,110,143,443,3389,8080)
+            [int[]]$Ports = @(21,22,80,443,8080)
         )
 
         Write-Host "`n Checking Port Banner's ... `n" -ForegroundColor Yellow
@@ -418,6 +572,7 @@ function Busca-Por-DNS {
             @{Name="Links in HTML"; Function={ScanLinks -url $url}}, 
             @{Name="Robots.txt"; Function={ScanRobotsTxt -url $url}},
             @{Name="Sitemap.xml"; Function={ScanSitemap -url $url}},
+            @{Name="Searching Record's"; Function={Get-DNSRecords -url $url}},
             @{Name="Port Banner Grabbing"; Function={Get-PortBanner -url $url}},
             @{Name="Words for Fuzzing"; Function={ScanHTML -url $url}}   
         )
@@ -450,6 +605,7 @@ while ($true) {
         "Discover Allowed HTTP Methods",
         "Capture Server Headers",
         "Detect Technologies in Use",
+        "Get-DNSRecords",
         "List Links Found in HTML",
         "Check the robots.txt File",
         "Check if Site has a Sitemap",
@@ -473,7 +629,7 @@ while ($true) {
     Write-Host "`n"
 
     # === Read-Host em vermelho ===
-    $option = Show-InputPrompt -input_name "Choose an option (1-13)"
+    $option = Show-InputPrompt -input_name "Choose an option (1-14)"
 
         switch ($option) {
             0 {
@@ -553,6 +709,10 @@ while ($true) {
                             Write-Host "        Shows the HTTP status code(s) returned by the target for the" -ForegroundColor White
                             Write-Host "        requested resource. Includes handling of redirects and final code." -ForegroundColor White
                             Write-Host ""
+                            Write-Host "    - Search for IP addresses (DNS lookup):" -ForegroundColor White
+                            Write-Host "        Retrieves IPv4 (A) and IPv6 (AAAA) addresses for the given domain." -ForegroundColor White
+                            Write-Host "        Displays the found IPs or indicates if none are available." -ForegroundColor White
+                            Write-Host ""
                             Write-Host "    - Retrieve <title> of the page:" -ForegroundColor White
                             Write-Host "        Reads the HTML title element to capture target page title metadata." -ForegroundColor White
                             Write-Host ""
@@ -563,6 +723,11 @@ while ($true) {
                             Write-Host "    - Capture service banners (ports):" -ForegroundColor White
                             Write-Host "        Optionally connects to given ports to read plaintext banners and" -ForegroundColor White
                             Write-Host "        service identifiers (when available)." -ForegroundColor White
+                            Write-Host ""
+                            Write-Host "    - Check DNS records for a domain:" -ForegroundColor White
+                            Write-Host "        Retrieves DNS information including MX, NS, SOA, CNAME, TXT records," -ForegroundColor White
+                            Write-Host "        and performs reverse lookup (PTR) for associated IP addresses." -ForegroundColor White
+                            Write-Host "        Provides detailed output for each record type when available." -ForegroundColor White
                             Write-Host ""
                             Write-Host "    - Run All Scans (aggregate):" -ForegroundColor White
                             Write-Host "        Executes a sequential run of the major checks and compiles results." -ForegroundColor White
@@ -601,11 +766,6 @@ while ($true) {
                             Write-Host "    - Logs are written to the script directory with timestamps in filenames." -ForegroundColor White
                             Write-Host "    - Each run appends a summary header and the raw outputs for each check." -ForegroundColor White
                             Write-Host "    - Use the logs for audit, reporting and reproduction of findings." -ForegroundColor White
-
-                            Write-Host "`n  LICENSE" -ForegroundColor Cyan
-                            Write-Host "    This program is licensed under the GNU Affero General Public License" -ForegroundColor White
-                            Write-Host "    v3.0 (AGPL-3.0). You may redistribute and/or modify under the terms of" -ForegroundColor White
-                            Write-Host "    that license. See the LICENSE file or visit: https://www.gnu.org/licenses/agpl-3.0.html" -ForegroundColor White
 
                             Write-Host "`n  CREDITS" -ForegroundColor Cyan
                             Write-Host "    - Author: Luan Calazans (2025)" -ForegroundColor White
@@ -738,7 +898,7 @@ while ($true) {
                     Write-Host ""
                 $url = Show-InputPrompt -input_name "Enter the website URL (ex: http://scanme.nmap.org)"
                 if (Test-ValidUrl $url) {
-                    ScanLinks -url $url
+                    Get-DNSRecords -url $url
                 } else {
                     Write-Host "`n               Invalid URL. Use http:// or https://" -ForegroundColor Red
                 }
@@ -751,7 +911,7 @@ while ($true) {
                     Write-Host ""
                 $url = Show-InputPrompt -input_name "Enter the website URL (ex: http://scanme.nmap.org)"
                 if (Test-ValidUrl $url) {
-                    ScanRobotsTxt -url $url
+                    ScanLinks -url $url
                 } else {
                     Write-Host "`n               Invalid URL. Use http:// or https://" -ForegroundColor Red
                 }
@@ -764,7 +924,7 @@ while ($true) {
                     Write-Host ""
                 $url = Show-InputPrompt -input_name "Enter the website URL (ex: http://scanme.nmap.org)"
                 if (Test-ValidUrl $url) {
-                    ScanSitemap -url $url
+                    ScanRobotsTxt -url $url
                 } else {
                     Write-Host "`n               Invalid URL. Use http:// or https://" -ForegroundColor Red
                 }
@@ -777,7 +937,7 @@ while ($true) {
                     Write-Host ""
                 $url = Show-InputPrompt -input_name "Enter the website URL (ex: http://scanme.nmap.org)"
                 if (Test-ValidUrl $url) {
-                    Get-PortBanner -url $url
+                    ScanSitemap -url $url
                 } else {
                     Write-Host "`n               Invalid URL. Use http:// or https://" -ForegroundColor Red
                 }
@@ -790,6 +950,19 @@ while ($true) {
                     Write-Host ""
                 $url = Show-InputPrompt -input_name "Enter the website URL (ex: http://scanme.nmap.org)"
                 if (Test-ValidUrl $url) {
+                    Get-PortBanner -url $url
+                } else {
+                    Write-Host "`n               Invalid URL. Use http:// or https://" -ForegroundColor Red
+                }
+                Write-Host "`nPress Enter to continue..." -ForegroundColor Gray
+                $null = Read-Host
+            }
+            12 {
+                Clear-Host
+                Logo_Menu
+                    Write-Host ""
+                $url = Show-InputPrompt -input_name "Enter the website URL (ex: http://scanme.nmap.org)"
+                if (Test-ValidUrl $url) {
                     ScanHTML -url $url
                 } else {
                     Write-Host "`n               Invalid URL. Use http:// or https://" -ForegroundColor Red 
@@ -797,7 +970,7 @@ while ($true) {
                 Write-Host "`nPress Enter to continue..." -ForegroundColor Gray
                 $null = Read-Host
             } 
-            12 {
+            13 {
                     Clear-Host
                     Logo_Menu
                     Write-Host ""
@@ -810,7 +983,7 @@ while ($true) {
                     $null = Read-Host
                 }
             }
-            13 {
+            14 {
                 Clear-Host
                 Logo_Menu
 
@@ -832,7 +1005,7 @@ while ($true) {
                 return
             }
             default {
-                Write-Host "`n`n               Invalid option. Choose a number between 1 and 13." -ForegroundColor Red
+                Write-Host "`n`n               Invalid option. Choose a number between 1 and 14." -ForegroundColor Red
                 Write-Host "`n               Press Enter to continue..." -ForegroundColor Gray
                 $null = Read-Host
             }
