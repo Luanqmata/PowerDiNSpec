@@ -8,7 +8,7 @@
 
 ---
 
-<img width="1223" height="900" alt="image" src="https://github.com/user-attachments/assets/79a359db-7e9d-4e82-a7a2-f90b0096eeda" />
+<img width="1190" height="808" alt="image" src="https://github.com/user-attachments/assets/dfde3afe-9e35-4427-b5bb-a2827bb93e4e" />
 
 ##  **PowerShell DNS Recon Tool**
   
