@@ -4,11 +4,11 @@
 
 ---
 
-<img width="1173" height="914" alt="image" src="https://github.com/user-attachments/assets/14e41268-b71e-4e3d-946c-32ed62bbf26e" />
+<img width="1209" height="915" alt="image" src="https://github.com/user-attachments/assets/646a7f22-1cb9-42e8-89e7-aebc5f11e770" />
 
 ---
 
-<img width="1190" height="808" alt="image" src="https://github.com/user-attachments/assets/dfde3afe-9e35-4427-b5bb-a2827bb93e4e" />
+<img width="1196" height="916" alt="image" src="https://github.com/user-attachments/assets/a359eebe-4a82-4657-bf0d-0743936b11e6" />
 
 ##  **PowerShell DNS Recon Tool**
   
