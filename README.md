@@ -1,6 +1,14 @@
 # PowerDiNSpec
 
-<img width="1385" height="899" alt="image" src="https://github.com/user-attachments/assets/bbf69121-e591-47c3-805b-e1b2e15a25ce" />
+<img width="1340" height="918" alt="image" src="https://github.com/user-attachments/assets/e1ca20c5-479d-4565-8ac5-36ff4d95cfbf" />
+
+---
+
+<img width="1173" height="914" alt="image" src="https://github.com/user-attachments/assets/14e41268-b71e-4e3d-946c-32ed62bbf26e" />
+
+---
+
+<img width="1223" height="900" alt="image" src="https://github.com/user-attachments/assets/79a359db-7e9d-4e82-a7a2-f90b0096eeda" />
 
 ##  **PowerShell DNS Recon Tool**
   
