@@ -20,7 +20,26 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 ===============================================================================
 #>
-# Definição de todas as funções de scan disponíveis
+
+function Logo_Menu {
+    $ascii = @"
+    
+                                                                                   _                        _
+                                       _  _      ,/\/\                            ( ) ___,      _ __    _  ( ) _ __                  ___
+                                     _| || |_    | '_ \  ___//__      __ ___  _ __ \||  _'\  _ | '_ \  | | |/ | '_ \  /\/\   ___    |__ \
+                                    |_  ..  _|   | |_) |/ _//\\ \ /\ / // _ \| '__|  | | | || || | | |/ __|   | |_) |/  _ \ / __|     / /
+                                    |_      _|   | .__/| (//) |\ V  V /|  __/| |     | |_/ || || | | |\__ \   | .__/|  ___/| (__     |_|
+                                      |_||_|     |_|    \//__/  \_/\_/  \___||_|     |____/ |_||_| |_||___/   |_|    \____| \___|
+                                                        //               | |                (_)        |_|                           (_)           2.0.5v
+
+                                         
+"@ -split "`n"
+
+    foreach ($line in $ascii) {
+        Write-Host $line -ForegroundColor Red
+    }
+}
+
 $global:AllScans = @(
     @{ Name = "HTTP Status Code";       Enabled = 1; Function = { param($url) ScanStatusCode -url $url } },
     @{ Name = "Page Title";             Enabled = 1; Function = { param($url) ScanTitle -url $url } },
@@ -42,34 +61,19 @@ if (-not (Get-Variable -Name "ScansConfig" -Scope Global -ErrorAction SilentlyCo
 
 # Configuração atual dos scans habilitados
 $global:ScansConfig = $global:AllScans | Where-Object { $_.Enabled -eq 1 }
-function Logo_Menu {
-    $ascii = @"
-    
-                                                                                   _                        _
-                                       _  _      ,/\/\                            ( ) ___,      _ __    _  ( ) _ __                  ___
-                                     _| || |_    | '_ \  ___//__      __ ___  _ __ \||  _'\  _ | '_ \  | | |/ | '_ \  /\/\   ___    |__ \
-                                    |_  ..  _|   | |_) |/ _//\\ \ /\ / // _ \| '__|  | | | || || | | |/ __|   | |_) |/  _ \ / __|     / /
-                                    |_      _|   | .__/| (//) |\ V  V /|  __/| |     | |_/ || || | | |\__ \   | .__/|  ___/| (__     |_|
-                                      |_||_|     |_|    \//__/  \_/\_/  \___||_|     |____/ |_||_| |_||___/   |_|    \____| \___|
-                                                        //               | |                (_)        |_|                           (_)           2.0.5v
-
-                                         
-"@ -split "`n"
-
-    foreach ($line in $ascii) {
-        Write-Host $line -ForegroundColor Red
-    }
-}
 
 function Show-InputPrompt {
     param(
         [string]$User = $env:USERNAME,
-        [string]$input_name = ""
+        [string]$input_name = "",
+        [int]$PaddingLeft = 0
     )
     
     $version = [System.Environment]::OSVersion.Version.ToString()
-
-    Write-Host "`n`n                                                  //~--~( " -NoNewline -ForegroundColor Red
+    $pad = " " * $PaddingLeft
+    
+    Write-Host "`n`n$pad" -NoNewline
+    Write-Host " //~--~( " -NoNewline -ForegroundColor Red
     Write-Host "$User" -NoNewline -ForegroundColor Gray
     Write-Host "@Win_Version=" -NoNewline -ForegroundColor Cyan
     Write-Host "/$version/" -NoNewline -ForegroundColor Yellow
@@ -79,8 +83,9 @@ function Show-InputPrompt {
     Write-Host "#" -NoNewline -ForegroundColor White
     Write-Host "]---> " -NoNewline -ForegroundColor Red
     Write-Host "$input_name" -ForegroundColor White
-    # linha inferior
-    Write-Host "                                                 /__~----~" -NoNewline -ForegroundColor Red
+
+    Write-Host "$pad" -NoNewline
+    Write-Host "/__~----~" -NoNewline -ForegroundColor Red
     Write-Host " > " -NoNewline -ForegroundColor Red
     Write-Host "@: " -NoNewline -ForegroundColor White
 
@@ -91,7 +96,6 @@ function Show-InputPrompt {
     
     return $option
 }
-
 function Busca-Por-DNS {
     $headers = @{
         "User-Agent" = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/100.0.0.0 Safari/537.36"
@@ -291,16 +295,17 @@ function Busca-Por-DNS {
         try {
             Write-Log "Looking for MX records for: $domain" "INFO"
             $mx = Resolve-DnsName -Name $domain -Type MX -ErrorAction Stop
-            if ($mx) {
-                Write-Host "`n  MX Records:" -ForegroundColor Yellow
+            if ($mx) { 
+                Write-host "`n Records found:" -ForegroundColor Green
+                Write-Host "   MX Records:" -ForegroundColor Yellow
                 $mx | ForEach-Object { 
-                    Write-Host "  $($_.NameExchange) (Pref: $($_.Preference))"
+                    Write-Host "   $($_.NameExchange) (Pref: $($_.Preference))"
                 }
                 Write-Log "MX records found for: $domain" "INFO"
             }
         }
         catch {
-            Write-Host "    No MX records found" -ForegroundColor Red
+            Write-Host "     No MX records found" -ForegroundColor Red
             Write-Log "No MX records found for: $domain" "WARNING"
         }
 
@@ -308,15 +313,15 @@ function Busca-Por-DNS {
             Write-Log "Looking for NS records for: $domain" "INFO"
             $ns = Resolve-DnsName -Name $domain -Type NS -ErrorAction Stop
             if ($ns) {
-                Write-Host "`n  NS Records:" -ForegroundColor Magenta
+                Write-Host "`n   NS Records:" -ForegroundColor Magenta
                 $ns | ForEach-Object { 
-                    Write-Host "  $($_.NameHost)"
+                    Write-Host "   $($_.NameHost)"
                 }
                 Write-Log "NS records found for: $domain" "INFO"
             }
         }
         catch {
-            Write-Host "    No NS records found" -ForegroundColor Red
+            Write-Host "     No NS records found" -ForegroundColor Red
             Write-Log "No NS records found for: $domain" "WARNING"
         }
 
@@ -324,17 +329,17 @@ function Busca-Por-DNS {
             Write-Log "Looking for SOA records for: $domain" "INFO"
             $soa = Resolve-DnsName -Name $domain -Type SOA -ErrorAction Stop
             if ($soa) {
-                Write-Host "`n  SOA Record:" -ForegroundColor DarkYellow
+                Write-Host "`n   SOA Record:" -ForegroundColor DarkYellow
                 $soa | ForEach-Object { 
-                    Write-Host "    Primary Server: $($_.PrimaryServer)"
-                    Write-Host "    Admin: $($_.NameAdministrator)"
-                    Write-Host "    Serial: $($_.SerialNumber)"
+                    Write-Host "     Primary Server: $($_.PrimaryServer)"
+                    Write-Host "     Admin: $($_.NameAdministrator)"
+                    Write-Host "     Serial: $($_.SerialNumber)"
                 }
                 Write-Log "SOA record found for: $domain" "INFO"
             }
         }
         catch {
-            Write-Host "    No SOA record found" -ForegroundColor Red
+            Write-Host "     No SOA record found" -ForegroundColor Red
             Write-Log "No SOA record found for: $domain" "WARNING"
         }
 
@@ -342,15 +347,15 @@ function Busca-Por-DNS {
             Write-Log "Looking for CNAME records for: $domain" "INFO"
             $cname = Resolve-DnsName -Name $domain -Type CNAME -ErrorAction Stop
             if ($cname) {
-                Write-Host "`n  CNAME Record:" -ForegroundColor DarkGreen
+                Write-Host "`n   CNAME Record:" -ForegroundColor DarkGreen
                 $cname | ForEach-Object { 
-                    Write-Host "    $($_.NameAlias) -> $($_.NameHost)"
+                    Write-Host "     $($_.NameAlias) -> $($_.NameHost)"
                 }
                 Write-Log "CNAME records found for: $domain" "INFO"
             }
         }
         catch {
-            Write-Host "    No CNAME records found" -ForegroundColor Red
+            Write-Host "     No CNAME records found" -ForegroundColor Red
             Write-Log "No CNAME records found for: $domain" "WARNING"
         }
 
@@ -358,15 +363,15 @@ function Busca-Por-DNS {
             Write-Log "Looking for TXT records for: $domain" "INFO"
             $txt = Resolve-DnsName -Name $domain -Type TXT -ErrorAction Stop
             if ($txt) {
-                Write-Host "`n  TXT Records:" -ForegroundColor DarkCyan
+                Write-Host "`n   TXT Records:" -ForegroundColor DarkCyan
                 $txt | ForEach-Object { 
-                    Write-Host "    $($_.Strings -join '; ')"
+                    Write-Host "     $($_.Strings -join '; ')"
                 }
                 Write-Log "TXT records found for: $domain" "INFO"
             }
         }
         catch {
-            Write-Host "    No TXT records found" -ForegroundColor Red
+            Write-Host "     No TXT records found" -ForegroundColor Red
             Write-Log "No TXT records found for: $domain" "WARNING"
         }
 
@@ -396,29 +401,28 @@ function Busca-Por-DNS {
         }
 
         if ($ips.Count -gt 0) {
-            Write-Host "`n  Reverse Lookup (PTR):" -ForegroundColor Cyan
+            Write-Host "`n   Reverse Lookup (PTR):" -ForegroundColor Cyan
             Write-Log "Starting PTR lookups for $($ips.Count) IP addresses" "INFO"
             
             foreach ($ip in $ips) {
                 try {
                     $hostEntry = [System.Net.Dns]::GetHostEntry($ip)
-                    Write-Host "    $ip -> $($hostEntry.HostName)"
+                    Write-Host "     $ip -> $($hostEntry.HostName)"
                     Write-Log "PTR found for $ip : $($hostEntry.HostName)" "INFO"
                 }
                 catch {
-                    Write-Host "    $ip -> PTR not found" -ForegroundColor DarkYellow
+                    Write-Host "     $ip -> PTR not found" -ForegroundColor DarkYellow
                     Write-Log "PTR not found for: $ip" "WARNING"
                 }
             }
         }
         else {
-            Write-Host "`n  No IP addresses found for reverse lookup." -ForegroundColor DarkYellow
+            Write-Host "`n   No IP addresses found for reverse lookup." -ForegroundColor DarkYellow
             Write-Log "No A or AAAA records found for reverse lookup: $domain" "INFO"
         }
 
         Write-Log "DNS records check completed for: $domain" "INFO"
     }
-
 
     function ScanLinks {
         param ([string]$url)
@@ -579,6 +583,17 @@ function Busca-Por-DNS {
     # funcao de configuração para runallscans
     function Configure-ScansInteractive {
 
+        # --- Sincroniza AllScans com a config atual ---
+        foreach ($scan in $global:AllScans) {
+            $name = $scan.Name
+            if ($global:ScansConfig | Where-Object { $_.Name -eq $name }) {
+                $scan.Enabled = 1
+            } else {
+                $scan.Enabled = 0
+            }
+        }
+
+        # Cria cópia de trabalho
         $scans = $global:AllScans.Clone()
         
         while ($true) {
@@ -587,13 +602,9 @@ function Busca-Por-DNS {
             Write-Host "`n                                                                              === Configure Scans ===" -ForegroundColor Red
             Write-Host "`n`n                    Configure which scans will be executed in the RunAllScans function (option:13)`n`n`n`n" -ForegroundColor Gray
 
-            
-            $width = 180
-
             $width = 180
 
             # formata o índice para que números de 1 digito e 2 digitos fiquem alinhados
-            # exemplo: " 1. Nome..." e "10. Nome..."
             $indexFormat = '{0,2}. {1}'
 
             # calcula a linha "entry" mais longa (sem o status)
@@ -605,101 +616,85 @@ function Busca-Por-DNS {
             }
 
             $maxEntryLength = ($entries | ForEach-Object { $_.Length } | Measure-Object -Maximum).Maximum
-
-            # comprimento do status (ex.: "[1]" ou "[0]") - assumimos 3 caracteres incluindo colchetes
             $statusLength = 3
-
-            # usa o comprimento máximo para decidir onde ficará a coluna do status; 
-            # centraliza o bloco (entry + espaço mínimo + status) dentro de $width
-            $blockWidth = $maxEntryLength + 1 + $statusLength   # +1 é o espaço mínimo entre nome e status
+            $blockWidth = $maxEntryLength + 1 + $statusLength
             $leftPaddingBase = [Math]::Max(0, [Math]::Floor(($width - $blockWidth) / 2))
 
             for ($i = 0; $i -lt $scans.Count; $i++) {
-                        $scan = $scans[$i]
-                        $index = $i + 1
-                        $entry = $indexFormat -f $index, $scan.Name
+                $scan = $scans[$i]
+                $index = $i + 1
+                $entry = $indexFormat -f $index, $scan.Name
+                $statusText = if ($scan.Enabled -eq 1) { '[1]' } else { '[0]' }
+                $innerPadLength = ($maxEntryLength - $entry.Length) + 1
+                if ($innerPadLength -lt 1) { $innerPadLength = 1 }
+                $innerPadding = ' ' * $innerPadLength
+                $leftPadding = ' ' * $leftPaddingBase
 
-                        $statusText = if ($scan.Enabled -eq 1) { '[1]' } else { '[0]' }
-
-                        $innerPadLength = ($maxEntryLength - $entry.Length) + 1
-                        if ($innerPadLength -lt 1) { $innerPadLength = 1 }
-                        $innerPadding = ' ' * $innerPadLength
-
-                        $leftPadding = ' ' * $leftPaddingBase
-
-                        Write-Host -NoNewline ($leftPadding + $entry + $innerPadding)
-                        if ($scan.Enabled -eq 1) {
-                            Write-Host $statusText -ForegroundColor Green
-                        } else {
-                            Write-Host $statusText -ForegroundColor Red
-                        }
-                    }
-            
-                Write-Host "`n`n`n                  Enter the number corresponding to the function you want to enable or disable" -ForegroundColor Yellow
-                Write-Host "`n`n                      Press [S] to Save and exit" -ForegroundColor Green
-                Write-Host "`n                      Press [Enter] to exit without saving`n" -ForegroundColor Gray
-                
-                $input = Show-InputPrompt -input_name "Select a number"
-                
-                if ([string]::IsNullOrWhiteSpace($input)) {
-                    Write-Host "`n                      Changes not saved!" -ForegroundColor Red
-                    Start-Sleep -Seconds 1
-                    return $global:ScansConfig
-                }
-                
-                if ($input -eq 'S' -or $input -eq 's') {
-                    $global:ScansConfig = $scans | Where-Object { $_.Enabled -eq 1 }
-                    Write-Host "`nCurrent configuration saved" -ForegroundColor Green
-                    Start-Sleep -Seconds 1
-                    return $global:ScansConfig
-                }
-                
-                if ($input -match '^\d+$') {
-                    $n = [int]$input
-                    if ($n -ge 1 -and $n -le $scans.Count) {
-                        $scans[$n-1].Enabled = 1 - $scans[$n-1].Enabled
-                        $status = if ($scans[$n-1].Enabled -eq 1) { "ENABLED" } else { "DISABLED" }
-                        $color = if ($scans[$n-1].Enabled -eq 1) { "Green" } else { "Red" }
-                        Write-Host "`n$($scans[$n-1].Name) -> $status" -ForegroundColor $color
-                        Start-Sleep -Milliseconds 600
-                    } else {
-                        Write-Host "`nNumber out of range (1-$($scans.Count))." -ForegroundColor Red
-                        Start-Sleep -Milliseconds 800
-                    }
+                Write-Host -NoNewline ($leftPadding + $entry + $innerPadding)
+                if ($scan.Enabled -eq 1) {
+                    Write-Host $statusText -ForegroundColor Green
                 } else {
-                    Write-Host "`n  Invalid input." -ForegroundColor Red
+                    Write-Host $statusText -ForegroundColor Red
+                }
+            }
+            
+            Write-Host "`n`n`n                  Enter the number corresponding to the function you want to enable or disable" -ForegroundColor Yellow
+            Write-Host "`n`n                      Press [S] to Save and exit" -ForegroundColor Green
+            Write-Host "`n                      Press [Enter] to exit without saving`n" -ForegroundColor Gray
+            
+            $input = Show-InputPrompt -input_name "Select a number"
+            
+            if ([string]::IsNullOrWhiteSpace($input)) {
+                Write-Host "`n                      Changes not saved!" -ForegroundColor Red
+                Start-Sleep -Seconds 1
+                return $global:ScansConfig
+            }
+            
+            if ($input -eq 'S' -or $input -eq 's') {
+                $global:ScansConfig = $scans | Where-Object { $_.Enabled -eq 1 }
+                Write-Host "`nCurrent configuration saved" -ForegroundColor Green
+                Start-Sleep -Seconds 1
+                return $global:ScansConfig
+            }
+            
+            if ($input -match '^\d+$') {
+                $n = [int]$input
+                if ($n -ge 1 -and $n -le $scans.Count) {
+                    $scans[$n-1].Enabled = 1 - $scans[$n-1].Enabled
+                    $status = if ($scans[$n-1].Enabled -eq 1) { "ENABLED" } else { "DISABLED" }
+                    $color = if ($scans[$n-1].Enabled -eq 1) { "Green" } else { "Red" }
+                    Write-Host "`n$($scans[$n-1].Name) -> $status" -ForegroundColor $color
+                    Start-Sleep -Milliseconds 600
+                } else {
+                    Write-Host "`nNumber out of range (1-$($scans.Count))." -ForegroundColor Red
                     Start-Sleep -Milliseconds 800
-                    Continue
-                } 
+                }
+            } else {
+                Write-Host "`n  Invalid input." -ForegroundColor Red
+                Start-Sleep -Milliseconds 800
+                Continue
+            } 
         }
-    }    
+    }
 
     function RunAllScans {
         param ([string]$url)
         
         clear-host
-        # Logo_Menu # fazer um logo_menu 2
+        # Logo_Menu # create a Logo_Menu2 later if needed
         Write-Host "`n                                  === Starting all checks for URL: $url ===`n" -ForegroundColor Red
         Write-Log "Starting RunAllScans for: $url"
         
-        # Usa a configuração GLOBAL salva
+        # Uses the GLOBAL configuration saved
         $scansToRun = $global:ScansConfig
         
-        Write-Host "Scans configurados para execução: $($scansToRun.Count)" -ForegroundColor Cyan
-        Write-Host "`n" -ForegroundColor Gray
-        
         if ($scansToRun.Count -eq 0) {
-            Write-Host "Nenhum scan habilitado! Configure os scans primeiro." -ForegroundColor Red
+            Write-Host "No scans enabled! Please configure the scans first." -ForegroundColor Red
             Write-Host "`nPress Enter to continue..." -ForegroundColor Gray
             $null = Read-Host
             return
         }
-        
-        # Mostra quais scans serão executados
-        Write-Host "Scans que serão executados:" -ForegroundColor Yellow
-        foreach ($scan in $scansToRun) {
-            Write-Host "  [X] $($scan.Name)" -ForegroundColor Green
-        }
+        Write-Host "You can configure the scans in the configuration menu." -ForegroundColor Gray      
         Write-Host ""
         
         $counter = 0
@@ -707,20 +702,20 @@ function Busca-Por-DNS {
             $counter++
             Write-Host "`n=== $counter. $($scan.Name) ===" -ForegroundColor Gray
             try {
-                # Executa a função do scan passando a URL como parâmetro
+                # Execute the scan function, passing the URL as parameter
                 & $scan.Function $url
             } catch {
-                Write-Host "Erro ao executar scan: $($_.Exception.Message)" -ForegroundColor Red
+                Write-Host "Error while executing scan: $($_.Exception.Message)" -ForegroundColor Red
             }
             Start-Sleep -Milliseconds 300
         }
         
         Write-Host "`n                                                  === All checks completed ===`n" -ForegroundColor Green
         Write-Log "RunAllScans completed for: $url"
-        Write-Host "`nTotal de scans executados: $counter" -ForegroundColor Cyan
         Write-Host "`nPress Enter to continue..." -ForegroundColor Gray
         $null = Read-Host
     }
+
 function Help {
     Clear-Host
     Logo_Menu
@@ -875,17 +870,29 @@ while ($true) {
     for ($i=0; $i -lt $menus.Count; $i++) {
         $num = $i 
         $spacing = " " * 74
-        Write-Host -NoNewline "$spacing["   
-        Write-Host -NoNewline (" {0} " -f $num) -ForegroundColor Cyan
-        Write-Host "]   " -NoNewline
-        Write-Host "$($menus[$i])" -ForegroundColor Red
+
+        if ($i -eq 0) {
+            # Apenas a opção 0 (Help & Configuration) em amarelo
+            Write-Host -NoNewline "$spacing["
+            Write-Host -NoNewline (" {0} " -f $num) -ForegroundColor Green
+            Write-Host "]   " -NoNewline
+            Write-Host "$($menus[$i])" -ForegroundColor Yellow
+        }
+        else {
+            # Demais opções (número ciano, texto vermelho)
+            Write-Host -NoNewline "$spacing["
+            Write-Host -NoNewline (" {0} " -f $num) -ForegroundColor Cyan
+            Write-Host "]   " -NoNewline
+            Write-Host "$($menus[$i])" -ForegroundColor Red
+        }
+
         Write-Host ""
     }
 
-    Write-Host "`n `n`n     Log is being saved to: $logFile" -ForegroundColor Yellow
+    Write-Host "`n `n`n                                                                                                                          Log is being saved to: $logFile `n" -ForegroundColor Yellow
 
     # === Read-Host em vermelho ===
-    $option = Show-InputPrompt -input_name "Choose an option (1-14)"
+    $option = Show-InputPrompt -input_name "Choose an option (1-14)" -PaddingLeft 26
 
         switch ($option) {
             0 {
@@ -902,13 +909,14 @@ while ($true) {
                     for ($i = 0; $i -lt $submenu.Count; $i++) {
                         $spacing = " " * 74
                         Write-Host -NoNewline "$spacing["
-                        Write-Host -NoNewline (" {0} " -f $i) -ForegroundColor Cyan
+                        Write-Host -NoNewline (" {0} " -f $i) -ForegroundColor Green
                         Write-Host "]   " -NoNewline
-                        Write-Host "$($submenu[$i])" -ForegroundColor Red
+                        Write-Host "$($submenu[$i])" -ForegroundColor Yellow
                         Write-Host ""
                     }
-
-                    $option_costumization = Show-InputPrompt -input_name "Choose an option (0-2)"
+                    
+                    Write-host "`n`n`n"
+                    $option_costumization = Show-InputPrompt -input_name "Choose an option (0-2)" -PaddingLeft 35
 
                     $choice = 0 
                     if (-not [int]::TryParse($option_costumization, [ref]$choice)) {
@@ -962,7 +970,7 @@ while ($true) {
                 Clear-Host
                 Logo_Menu
                     Write-Host ""
-                $url = Show-InputPrompt -input_name "Enter the website URL (ex: http://scanme.nmap.org)"
+                $url = Show-InputPrompt -input_name "Enter the website URL (ex: http://scanme.nmap.org)" -PaddingLeft 19
                 if (Test-ValidUrl $url) {
                     ScanStatusCode -url $url
                 } else {
@@ -975,7 +983,7 @@ while ($true) {
                 Clear-Host
                 Logo_Menu
                     Write-Host ""
-                $url = Show-InputPrompt -input_name "Enter the website URL (ex: http://scanme.nmap.org)"
+                $url = Show-InputPrompt -input_name "Enter the website URL (ex: http://scanme.nmap.org)" -PaddingLeft 19
                 if (Test-ValidUrl $url) {
                     ScanTitle -url $url
                 } else {
@@ -988,11 +996,11 @@ while ($true) {
                 Clear-Host
                 Logo_Menu
                 Write-Host ""
-                $url = Show-InputPrompt -input_name "Enter the website URL (ex: http://scanme.nmap.org)"
+                $url = Show-InputPrompt -input_name "Enter the website URL (ex: http://scanme.nmap.org)" -PaddingLeft 19
                 if (Test-ValidUrl $url) {
                     Get-ip-from-url -url $url
                 } else {
-                    Write-Host "`n               Invalid URL. Use http:// or https://" -ForegroundColor Red
+                    Write-Host "`n               Invalid URL. Use http:// or https://" -ForegroundColor Red 
                 }
                 Write-Host "`nPress Enter to continue..." -ForegroundColor Gray
                 $null = Read-Host
@@ -1001,7 +1009,7 @@ while ($true) {
                 Clear-Host
                 Logo_Menu
                     Write-Host ""
-                $url = Show-InputPrompt -input_name "Enter the website URL (ex: http://scanme.nmap.org)"
+                $url = Show-InputPrompt -input_name "Enter the website URL (ex: http://scanme.nmap.org)" -PaddingLeft 19
                 if (Test-ValidUrl $url) {
                     ScanOptions -url $url
                 } else {
@@ -1014,7 +1022,7 @@ while ($true) {
                 Clear-Host
                 Logo_Menu
                     Write-Host ""
-                $url = Show-InputPrompt -input_name "Enter the website URL (ex: http://scanme.nmap.org)"
+                $url = Show-InputPrompt -input_name "Enter the website URL (ex: http://scanme.nmap.org)" -PaddingLeft 19
                 if (Test-ValidUrl $url) {
                     ScanHeaders -url $url
                 } else {
@@ -1027,7 +1035,7 @@ while ($true) {
                 Clear-Host
                 Logo_Menu
                     Write-Host ""
-                $url = Show-InputPrompt -input_name "Enter the website URL (ex: http://scanme.nmap.org)"
+                $url = Show-InputPrompt -input_name "Enter the website URL (ex: http://scanme.nmap.org)" -PaddingLeft 19
                 if (Test-ValidUrl $url) {
                     ScanTech -url $url
                 } else {
@@ -1040,7 +1048,7 @@ while ($true) {
                 Clear-Host
                 Logo_Menu
                     Write-Host ""
-                $url = Show-InputPrompt -input_name "Enter the website URL (ex: http://scanme.nmap.org)"
+                $url = Show-InputPrompt -input_name "Enter the website URL (ex: http://scanme.nmap.org)" -PaddingLeft 19
                 if (Test-ValidUrl $url) {
                     Get-DNSRecords -url $url
                 } else {
@@ -1052,8 +1060,8 @@ while ($true) {
             8 {
                 Clear-Host
                 Logo_Menu
-                    Write-Host ""
-                $url = Show-InputPrompt -input_name "Enter the website URL (ex: http://scanme.nmap.org)"
+                    Write-Host "" 
+                $url = Show-InputPrompt -input_name "Enter the website URL (ex: http://scanme.nmap.org)" -PaddingLeft 19
                 if (Test-ValidUrl $url) {
                     ScanLinks -url $url
                 } else {
@@ -1066,7 +1074,7 @@ while ($true) {
                 Clear-Host
                 Logo_Menu
                     Write-Host ""
-                $url = Show-InputPrompt -input_name "Enter the website URL (ex: http://scanme.nmap.org)"
+                $url = Show-InputPrompt -input_name "Enter the website URL (ex: http://scanme.nmap.org)" -PaddingLeft 19
                 if (Test-ValidUrl $url) {
                     ScanRobotsTxt -url $url
                 } else {
@@ -1079,7 +1087,7 @@ while ($true) {
                 Clear-Host
                 Logo_Menu
                     Write-Host ""
-                $url = Show-InputPrompt -input_name "Enter the website URL (ex: http://scanme.nmap.org)"
+                $url = Show-InputPrompt -input_name "Enter the website URL (ex: http://scanme.nmap.org)" -PaddingLeft 19
                 if (Test-ValidUrl $url) {
                     ScanSitemap -url $url
                 } else {
@@ -1092,7 +1100,7 @@ while ($true) {
                 Clear-Host
                 Logo_Menu
                     Write-Host ""
-                $url = Show-InputPrompt -input_name "Enter the website URL (ex: http://scanme.nmap.org)"
+                $url = Show-InputPrompt -input_name "Enter the website URL (ex: http://scanme.nmap.org)" -PaddingLeft 19
                 if (Test-ValidUrl $url) {
                     Get-PortBanner -url $url
                 } else {
@@ -1105,7 +1113,7 @@ while ($true) {
                 Clear-Host
                 Logo_Menu
                     Write-Host ""
-                $url = Show-InputPrompt -input_name "Enter the website URL (ex: http://scanme.nmap.org)"
+                $url = Show-InputPrompt -input_name "Enter the website URL (ex: http://scanme.nmap.org)" -PaddingLeft 19
                 if (Test-ValidUrl $url) {
                     ScanHTML -url $url
                 } else {
@@ -1118,7 +1126,7 @@ while ($true) {
                 Clear-Host
                 Logo_Menu
                 Write-Host ""
-                $url = Show-InputPrompt -input_name "Enter the website URL (ex: http://scanme.nmap.org)"
+                $url = Show-InputPrompt -input_name "Enter the website URL (ex: http://scanme.nmap.org)" -PaddingLeft 19
                 if (Test-ValidUrl $url) {
                     RunAllScans -url $url
                 } else {
@@ -1158,3 +1166,4 @@ while ($true) {
 }
 
 Busca-Por-DNS
+    
