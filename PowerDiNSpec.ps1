@@ -123,9 +123,9 @@ function Busca-Por-DNS {
             Clear-Host 
             Logo_Menu
             Write-Host "`n                                                                              === Configure Scans ===" -ForegroundColor Red
-            Write-Host "`n`n                         Configure which scans will be executed in the RunAllScans function (option:13)`n`n" -ForegroundColor Gray
+            Write-Host "`n`n                                   Configure which scans will be executed in the RunAllScans function (option:13)`n`n" -ForegroundColor Gray
 
-            $width = 120
+            $width = 180
 
             # formata índice
             $indexFormat = '{0,2}. {1}'
@@ -161,16 +161,16 @@ function Busca-Por-DNS {
                 }
             }
             
-            Write-Host "`n`n`n                       Enter the number corresponding to the function you want to Enable or Disable or Select Preset's" -ForegroundColor Yellow
-            Write-Host "`n`n                              [Preset's]" -ForegroundColor Cyan
-            Write-Host "                                           [W] - Web Checks (1,3,5,6)" -ForegroundColor Gray
-            Write-Host "                                           [D] - DNS & Network (4,8)" -ForegroundColor Gray
-            Write-Host "                                           [C] - Crawling & Discovery (9,10,11,12)" -ForegroundColor Gray
-            Write-Host "                                           [S] - Security & Infra (2,7,12)" -ForegroundColor Gray
-            Write-Host "                                           [A] - Active All (1 to 12)" -ForegroundColor Gray
-            Write-Host "`n`n                       Press [Enter] to Save and exit" -ForegroundColor Green
+            Write-Host "`n`n`n                                   Enter the number corresponding to the function you want to Enable or Disable or Select Preset's" -ForegroundColor Yellow
+            Write-Host "`n`n                                                               [Preset's]" -ForegroundColor Cyan
+            Write-Host "                                                                            [W] - Web Checks (1,3,5,6)" -ForegroundColor Gray
+            Write-Host "                                                                            [D] - DNS & Network (4,8)" -ForegroundColor Gray
+            Write-Host "                                                                            [C] - Crawling & Discovery (9,10,11,12)" -ForegroundColor Gray
+            Write-Host "                                                                            [S] - Security & Infra (2,7,12)" -ForegroundColor Gray
+            Write-Host "                                                                            [A] - Active All (1 to 12)" -ForegroundColor Gray
+            Write-Host "`n`n                                  Press [Enter] to Save and exit`n`n" -ForegroundColor Green
 
-            $input = Show-InputPrompt -input_name "Select a Number or Preset" -PaddingLeft 19
+            $input = Show-InputPrompt -input_name "Select a Number or Preset" -PaddingLeft 25
             
             if ([string]::IsNullOrWhiteSpace($input)) {
                 $global:ScansConfig = $scans | Where-Object { $_.Enabled -eq 1 }
@@ -262,29 +262,29 @@ function Busca-Por-DNS {
             Logo_Menu
             Write-Host "`n                                                                   === Configure Ports for Banner Scan ===" -ForegroundColor Red
             # Mostra portas atuais
-            Write-Host "`n`n                     Selected Ports for BANNER GRAB: `n                 [ $($global:PortsForBannerScan -join ', ') ]`n" -ForegroundColor Yellow
+            Write-Host "`n`n                      Selected Ports for BANNER GRAB: `n               [ $($global:PortsForBannerScan -join ', ') ]`n" -ForegroundColor White
             
-            Write-Host "`n                                [Preset's]`n`n                                                 Press [M] to use Most Used ports " -ForegroundColor Gray
-            Write-Host "`n                                                     [     p21:FTP      ]" -ForegroundColor DarkRed
-            Write-Host "                                                     [     p22:SSH      ]" -ForegroundColor DarkRed
-            Write-Host "                                                     [     p23:TELNET   ]" -ForegroundColor DarkRed
-            Write-Host "                                                     [     p25:SMTP     ]" -ForegroundColor DarkRed
-            Write-Host "                                                     [     p53:DNS      ]" -ForegroundColor DarkRed
-            Write-Host "                                                     [     p80:HTTP     ]" -ForegroundColor DarkRed
-            Write-Host "                                                     [     p443:HTTPS   ]" -ForegroundColor DarkRed
-            Write-Host "                                                     [     p3306:MySQL  ]" -ForegroundColor DarkRed
-            Write-Host "                                                     [     p3389:RDP    ]" -ForegroundColor DarkRed   
-            Write-Host "                                                     [ p5432:PostgreSQL ]" -ForegroundColor DarkRed
-            Write-Host "                                                     [  p8080:HTTP-ALT  ]`n" -ForegroundColor DarkRed
-            Write-Host "`n                                                 Press [W] - Web Services" -ForegroundColor Gray
-            Write-Host "                                                 Press [D] - Databases" -ForegroundColor Gray
-            Write-Host "                                                 Press [E] - Email" -ForegroundColor Gray
-            Write-Host "                                                 Press [R] - Network/Admin" -ForegroundColor Gray
-            Write-Host "                                                 Press [A] - APIs/Services" -ForegroundColor Gray
-            Write-Host "                                                 Press [F] - Frequent Ports" -ForegroundColor Gray
-            Write-Host "`n`n`n                                            Press [Enter] to save the current ports `n" -ForegroundColor Green
+            Write-Host "`n                                                        [Preset's]`n                                                                    Press [M] to use Most Used ports " -ForegroundColor Gray
+            Write-Host "`n                                                                            [     p21:FTP      ]" -ForegroundColor DarkRed
+            Write-Host "                                                                            [     p22:SSH      ]" -ForegroundColor DarkRed
+            Write-Host "                                                                            [     p23:TELNET   ]" -ForegroundColor DarkRed
+            Write-Host "                                                                            [     p25:SMTP     ]" -ForegroundColor DarkRed
+            Write-Host "                                                                            [     p53:DNS      ]" -ForegroundColor DarkRed
+            Write-Host "                                                                            [     p80:HTTP     ]" -ForegroundColor DarkRed
+            Write-Host "                                                                            [     p443:HTTPS   ]" -ForegroundColor DarkRed
+            Write-Host "                                                                            [     p3306:MySQL  ]" -ForegroundColor DarkRed
+            Write-Host "                                                                            [     p3389:RDP    ]" -ForegroundColor DarkRed   
+            Write-Host "                                                                            [ p5432:PostgreSQL ]" -ForegroundColor DarkRed
+            Write-Host "                                                                            [  p8080:HTTP-ALT  ]`n" -ForegroundColor DarkRed
+            Write-Host "`n                                                                          Press [W] - Web Services" -ForegroundColor Gray
+            Write-Host "                                                                          Press [D] - Databases" -ForegroundColor Gray
+            Write-Host "                                                                          Press [E] - Email" -ForegroundColor Gray
+            Write-Host "                                                                          Press [R] - Network/Admin" -ForegroundColor Gray
+            Write-Host "                                                                          Press [A] - APIs/Services" -ForegroundColor Gray
+            Write-Host "                                                                          Press [F] - Frequent Ports" -ForegroundColor Gray
+            Write-Host "`n`n`n                                          Press [Enter] to save the current ports `n" -ForegroundColor Green
 
-            $escolha = Show-InputPrompt -input_name "Enter ports separated by ',' (ex: 80,443,8080,8443)" -PaddingLeft 9
+            $escolha = Show-InputPrompt -input_name "Enter ports separated by ',' (ex: 80,443,8080,8443)" -PaddingLeft 20
             
             if ([string]::IsNullOrWhiteSpace($escolha)) {
                 Write-Host "`n                    Selected Ports: $($global:PortsForBannerScan -join ', ')" -ForegroundColor Yellow
