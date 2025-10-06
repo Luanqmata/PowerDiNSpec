@@ -49,6 +49,7 @@ $global:AllScans = @(
     @{ Name = "Allowed HTTP Methods";   Enabled = 1; Function = { param($url) ScanOptions -url $url } },
     @{ Name = "Server Headers";         Enabled = 1; Function = { param($url) ScanHeaders -url $url } },
     @{ Name = "Technologies in Use";    Enabled = 1; Function = { param($url) ScanTech -url $url } },
+    @{ Name = "Security Headers Check"; Enabled = 1; Function = { param($url) Test-SecurityHeaders -url $url } },
     @{ Name = "Links in HTML";          Enabled = 1; Function = { param($url) ScanLinks -url $url } },
     @{ Name = "Robots.txt";             Enabled = 1; Function = { param($url) ScanRobotsTxt -url $url } },
     @{ Name = "Sitemap.xml";            Enabled = 1; Function = { param($url) ScanSitemap -url $url } },
@@ -623,6 +624,21 @@ Connection: close`r`n
         }
     }
 #--- Funções auxiliares para requisições web e validação de URL ===
+function Get-EstimatedTime {
+    param($scans)
+    
+    $baseTimePerScan = 3
+    $portScanTime = if ($global:ScansConfig.Name -contains "Port Banner Grabbing") {
+        [math]::Round(($global:PortsForBannerScan.Count * 2) / 60, 1)
+    } else { 0 }
+    
+    $webRequestTime = $scans.Count * $baseTimePerScan
+    $totalSeconds = $webRequestTime + ($portScanTime * 60)
+    
+    $minutes = [math]::Max(0.5, [math]::Round($totalSeconds / 60, 1))
+    
+    return $minutes
+}
     function Test-ValidUrl {
         param ([string]$url)
         try {
@@ -781,6 +797,49 @@ Connection: close`r`n
         }
     }
 
+    function Test-SecurityHeaders {
+        param([string]$url)
+        
+        try {
+            Write-Host "`n Checking Security Headers..." -ForegroundColor Yellow
+            Write-Log "Starting Security Headers check for: $url"
+            
+            $securityHeaders = @(
+                'Strict-Transport-Security',
+                'Content-Security-Policy', 
+                'X-Frame-Options',
+                'X-Content-Type-Options',
+                'X-XSS-Protection',
+                'Referrer-Policy',
+                'Permissions-Policy',
+                'X-Permitted-Cross-Domain-Policies'
+            )
+            
+            $response = Invoke-WebRequest -Uri $url -Method Head -TimeoutSec 10 -Headers $headers
+            
+            Write-Host "`nSecurity Headers Analysis:" -ForegroundColor Green
+            
+            $foundHeaders = 0
+            foreach ($header in $securityHeaders) {
+                if ($response.Headers[$header]) {
+                    Write-Host "  $header : $($response.Headers[$header])" -ForegroundColor Green
+                    Write-Log "Security Header found: $header = $($response.Headers[$header])"
+                    $foundHeaders++
+                } else {
+                    Write-Host "  $header : Missing" -ForegroundColor Red
+                    Write-Log "Security Header missing: $header" "WARNING"
+                }
+            }
+            
+            Write-Host "`n  Summary: $foundHeaders/$($securityHeaders.Count) security headers present" -ForegroundColor $(if ($foundHeaders -ge 5) { "Green" } else { "Yellow" })
+            Write-Log "Security Headers check completed: $foundHeaders headers found"
+            
+        }
+        catch {
+            Write-Host "  Failed to check security headers: $($_.Exception.Message)" -ForegroundColor Red
+            Write-Log "Security Headers check failed: $($_.Exception.Message)" "ERROR"
+        }
+    }
     function ScanTech {
         param ([string]$url)
         try {
@@ -1017,10 +1076,12 @@ Connection: close`r`n
         Write-Log "Starting Get-PortBanner" "INFO"
         $uri = [System.Uri]$url
         $CleanHost = $uri.Host
-        
+
         Write-Host "    Scanning ports: `n [ $($global:PortsForBannerScan -join ', ') ]`n" -ForegroundColor White
         
-        # Define portas web para usar Test-HttpService
+        $estimatedPortTime = [math]::Round(($global:PortsForBannerScan.Count * 2) / 60, 1)
+        Write-Host " Estimated time for port scan: $estimatedPortTime minutes" -ForegroundColor Yellow  
+        
         $webPorts = @(80, 443, 8080, 8443, 8888, 9080, 9090, 8000, 3000, 5000, 7443, 9443)
         
         $protocolCommands = @{
@@ -1049,9 +1110,19 @@ Connection: close`r`n
         }
 
         $PortsShuffled = $global:PortsForBannerScan | Sort-Object {Get-Random}
+        $portCounter = 0
+        $totalPorts = $PortsShuffled.Count
 
         foreach ($Port in $PortsShuffled) {
-            $delay = Get-Random -Minimum 100 -Maximum 2000
+            $portCounter++
+            $percentComplete = [math]::Round(($portCounter / $totalPorts) * 100)
+            
+            Write-Progress -Activity "Port Banner Grabbing" `
+                        -Status "Testing port $Port ($portCounter/$totalPorts)" `
+                        -PercentComplete $percentComplete `
+                        -CurrentOperation "Target: $CleanHost"
+            
+            $delay = Get-Random -Minimum 50 -Maximum 500
             Start-Sleep -Milliseconds $delay
 
             try {
@@ -1177,8 +1248,10 @@ Connection: close`r`n
                 Write-Log "General error on ${CleanHost}:${Port} - $($_.Exception.Message)" "WARNING"
             }
         }
+        
+        Write-Progress -Activity "Port Banner Grabbing" -Status "Completed!" -Completed
+        Write-Host "`n Port scanning completed!`n" -ForegroundColor Green
     }
-
     function ScanHTML {
         param ([string]$url)
         try {
@@ -1190,7 +1263,7 @@ Connection: close`r`n
             $htmlContent = $response.Content
 
             # Extract words with improved regex
-            $palavras = $htmlContent -split '[^\p{L}0-9_\-]+' |
+            $palavras = ($htmlContent -split '[^\p{L}0-9_\-]+') |
                         Where-Object { $_.Length -gt 2 -and -not $_.StartsWith('#') -and -not $_.StartsWith('//') } |
                         Select-Object -Unique |
                         Sort-Object
@@ -1464,6 +1537,7 @@ while ($true) {
         "Get IP Address from DNS",
         "Discover Allowed HTTP Methods",
         "Capture Server Headers",
+        "Security Headers Analysis",
         "Detect Technologies in Use",
         "Get-DNSRecords",
         "List Links Found in HTML",
@@ -1471,7 +1545,7 @@ while ($true) {
         "Check if Site has a Sitemap",
         "Capture Port's Banner's",
         "Get All Words from the Site",
-        "Run All Scans (1 to 12)",
+        "Run All Scans (1 to 13)",
         "Exit"
     )
 
@@ -1648,10 +1722,10 @@ while ($true) {
             6 {
                 Clear-Host
                 Logo_Menu
-                    Write-Host ""
+                Write-Host ""
                 $url = Show-InputPrompt -input_name "Enter the website URL (ex: http://scanme.nmap.org)" -PaddingLeft 19
                 if (Test-ValidUrl $url) {
-                    ScanTech -url $url
+                    Test-SecurityHeaders -url $url
                 } else {
                     Write-Host "`n               Invalid URL. Use http:// or https://" -ForegroundColor Red
                 }
@@ -1664,7 +1738,7 @@ while ($true) {
                     Write-Host ""
                 $url = Show-InputPrompt -input_name "Enter the website URL (ex: http://scanme.nmap.org)" -PaddingLeft 19
                 if (Test-ValidUrl $url) {
-                    Get-DNSRecords -url $url
+                    ScanTech -url $url
                 } else {
                     Write-Host "`n               Invalid URL. Use http:// or https://" -ForegroundColor Red
                 }
@@ -1672,6 +1746,19 @@ while ($true) {
                 $null = Read-Host
             }
             8 {
+                Clear-Host
+                Logo_Menu
+                    Write-Host ""
+                $url = Show-InputPrompt -input_name "Enter the website URL (ex: http://scanme.nmap.org)" -PaddingLeft 19
+                if (Test-ValidUrl $url) {
+                    Get-DNSRecords -url $url
+                } else {
+                    Write-Host "`n               Invalid URL. Use http:// or https://" -ForegroundColor Red
+                }
+                Write-Host "`nPress Enter to continue..." -ForegroundColor Gray
+                $null = Read-Host
+            }
+            9 {
                 Clear-Host
                 Logo_Menu
                     Write-Host "" 
@@ -1684,7 +1771,7 @@ while ($true) {
                 Write-Host "`nPress Enter to continue..." -ForegroundColor Gray
                 $null = Read-Host
             }
-            9 {
+            10 {
                 Clear-Host
                 Logo_Menu
                     Write-Host ""
@@ -1697,7 +1784,7 @@ while ($true) {
                 Write-Host "`nPress Enter to continue..." -ForegroundColor Gray
                 $null = Read-Host
             }
-            10 {
+            11 {
                 Clear-Host
                 Logo_Menu
                     Write-Host ""
@@ -1710,7 +1797,7 @@ while ($true) {
                 Write-Host "`nPress Enter to continue..." -ForegroundColor Gray
                 $null = Read-Host
             }
-            11 {
+            12 {
                 Clear-Host
                 Logo_Menu
                 Write-Host ""
@@ -1723,7 +1810,7 @@ while ($true) {
                 Write-Host "`nPress Enter to continue..." -ForegroundColor Gray
                 $null = Read-Host
             }
-            12 {
+            13 {
                 Clear-Host
                 Logo_Menu
                     Write-Host ""
@@ -1736,7 +1823,7 @@ while ($true) {
                 Write-Host "`nPress Enter to continue..." -ForegroundColor Gray
                 $null = Read-Host
             } 
-            13 {
+            14 {
                 Clear-Host
                 Logo_Menu
                 Write-Host ""
@@ -1749,7 +1836,7 @@ while ($true) {
                     $null = Read-Host
                 }
             }
-            14 {
+            15 {
                 Clear-Host
                 Logo_Menu
 
@@ -1771,7 +1858,7 @@ while ($true) {
                 return
             }
             default {
-                Write-Host "`n`n               Invalid option. Choose a number between 1 and 14." -ForegroundColor Red
+                Write-Host "`n`n               Invalid option. Choose a number between 1 and 15." -ForegroundColor Red
                 Write-Host "`n               Press Enter to continue..." -ForegroundColor Gray
                 $null = Read-Host
             }
