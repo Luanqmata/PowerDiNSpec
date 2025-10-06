@@ -43,7 +43,7 @@ function Logo_Menu {
 # =============================================
 # VARIÁVEIS GLOBAIS E CONFIGURAÇÕES
 # =============================================
-$global:PortsForBannerScan = @(21,22,80,443,8080)
+$global:PortsForBannerScan = @(21,22,80,443,3306,5432,8080)
 
 $global:AllScans = @(
     @{ Name = "HTTP Status Code";       Enabled = 1; Function = { param($url) ScanStatusCode -url $url } },
@@ -52,14 +52,14 @@ $global:AllScans = @(
     @{ Name = "Allowed HTTP Methods";   Enabled = 1; Function = { param($url) ScanOptions -url $url } },
     @{ Name = "Server Headers";         Enabled = 1; Function = { param($url) ScanHeaders -url $url } },
     @{ Name = "Technologies in Use";    Enabled = 1; Function = { param($url) ScanTech -url $url } },
-    @{ Name = "Security Headers Check"; Enabled = 1; Function = { param($url) Test-SecurityHeaders -url $url } },
-    @{ Name = "DNS Zone Transfer Test"; Enabled = 1; Function = { param($url) Test-DNSZoneTransfer -url $url } },
-    @{ Name = "Comprehensive DNS Records"; Enabled = 1; Function = { param($url) Get-DNSRecords -url $url } },
+    @{ Name = "Security Headers Check"; Enabled = 0; Function = { param($url) Test-SecurityHeaders -url $url } },
+    @{ Name = "DNS Zone Transfer Test"; Enabled = 0; Function = { param($url) Test-DNSZoneTransfer -url $url } },
+    @{ Name = "Check DNS Records";      Enabled = 0; Function = { param($url) Get-DNSRecords -url $url } },
     @{ Name = "Links in HTML";          Enabled = 1; Function = { param($url) ScanLinks -url $url } },
     @{ Name = "Robots.txt";             Enabled = 1; Function = { param($url) ScanRobotsTxt -url $url } },
     @{ Name = "Sitemap.xml";            Enabled = 1; Function = { param($url) ScanSitemap -url $url } },
-    @{ Name = "Port Banner Grabbing";   Enabled = 1; Function = { param($url) Get-PortBanner -url $url } },
-    @{ Name = "Words for Fuzzing";      Enabled = 1; Function = { param($url) ScanHTML -url $url } }
+    @{ Name = "Port Banner Grabbing";   Enabled = 0; Function = { param($url) Get-PortBanner -url $url } },
+    @{ Name = "Words for Fuzzing";      Enabled = 0; Function = { param($url) ScanHTML -url $url } }
 )
 
 # Se a variável global ScansConfig não existir, inicializa com os scans habilitados por padrão
@@ -554,7 +554,7 @@ function Test-SecurityHeaders {
             }
         }
         
-        Write-Host "`n  Summary: $foundHeaders/$($securityHeaders.Count) security headers present" -ForegroundColor $(if ($foundHeaders -ge 5) { "Green" } else { "Yellow" })
+        Write-Host "`n  Summary: $foundHeaders/$($securityHeaders.Count) security headers present" -ForegroundColor $(if ($foundHeaders -ge 5) { "Green" } else { "DarkRed" })
         Write-Log "Security Headers check completed: $foundHeaders headers found"
         
     }
@@ -874,7 +874,7 @@ function Test-DNSZoneTransfer {
     
     $domain = ($url -replace '^https?://', '') -replace '/.*$', ''
     
-    Write-Host "`n Testing DNS Zone Transfer for: $domain" -ForegroundColor Yellow
+    Write-Host "`n  Testing DNS Zone Transfer for: $domain ..." -ForegroundColor Yellow
     
     try {
         $nsServers = Resolve-DnsName -Name $domain -Type NS -ErrorAction Stop | Where-Object Type -eq 'NS'
@@ -884,25 +884,25 @@ function Test-DNSZoneTransfer {
             return
         }
         
-        Write-Host "  Found $($nsServers.Count) name servers" -ForegroundColor Cyan
+        Write-Host "   Found $($nsServers.Count) name servers" -ForegroundColor Green
         
         $zoneTransferVulnerable = $false
         
         foreach ($ns in $nsServers) {
-            Write-Host "`n  Trying zone transfer from: $($ns.NameServer)" -ForegroundColor Cyan
+            Write-Host "`n   Trying zone transfer from: $($ns.NameServer)" -ForegroundColor Cyan
             try {
                 $zone = Resolve-DnsName -Name $domain -Type Any -Server $ns.NameServer -ErrorAction Stop
                 if ($zone) {
-                    Write-Host "  ZONE TRANSFER VULNERABLE!" -ForegroundColor Red
-                    Write-Host "  All DNS records exposed:" -ForegroundColor Red
+                    Write-Host "`n   ZONE TRANSFER VULNERABLE!" -ForegroundColor Red
+                    Write-Host "   All DNS records exposed:" -ForegroundColor Yellow
                     
                     $zone | Select-Object -First 10 | Format-Table Name, Type, IPAddress -AutoSize
                     
-                    Write-Host "  Total records exposed: $($zone.Count)" -ForegroundColor Red
+                    Write-Host "   Total records exposed: $($zone.Count)" -ForegroundColor Red
                     $zoneTransferVulnerable = $true
                 }
             } catch {
-                Write-Host "  Zone transfer blocked" -ForegroundColor Green
+                Write-Host "   Zone transfer blocked" -ForegroundColor DarkGreen
             }
         }
         
@@ -978,7 +978,7 @@ function Get-PortBanner {
 
         try {
             if ($Port -in $webPorts) {
-                Write-Host "    Testing web service on port $Port..." -ForegroundColor Cyan
+                Write-Host "`n    Testing web service on port $Port..." -ForegroundColor Cyan
                 $banner = Test-HttpService -TargetHost $CleanHost -Port $Port -Timeout 5000
                 
                 if ($banner) {
@@ -1236,7 +1236,6 @@ function Configure-PortsForBanner {
 }
 
 function Configure-ScansInteractive {
-
     foreach ($scan in $global:AllScans) {
         $name = $scan.Name
         if ($global:ScansConfig | Where-Object { $_.Name -eq $name }) {
@@ -1292,20 +1291,29 @@ function Configure-ScansInteractive {
         
         Write-Host "`n`n                                                            [Preset's]" -ForegroundColor Red
         Write-Host "`n                                                                       Press " -NoNewline -ForegroundColor DarkRed
-        Write-Host "[W]" -NoNewline -ForegroundColor DarkGreen
-        Write-Host " - Web Checks (1,3,5,6)" -ForegroundColor Gray
+        Write-Host "[B]" -NoNewline -ForegroundColor DarkGreen
+        Write-Host " - Basic Recon (1,2,3,5,6)" -ForegroundColor Gray
         Write-Host "                                                                       Press " -NoNewline -ForegroundColor DarkRed
-        Write-Host "[D]" -NoNewline -ForegroundColor DarkGreen
-        Write-Host " - DNS & Network (4,8)" -ForegroundColor Gray
+        Write-Host "[W]" -NoNewline -ForegroundColor DarkGreen
+        Write-Host " - Web Application (1,2,4,5,6,10)" -ForegroundColor Gray
+        Write-Host "                                                                       Press " -NoNewline -ForegroundColor DarkRed
+        Write-Host "[N]" -NoNewline -ForegroundColor DarkGreen
+        Write-Host " - Network & DNS (3,8,9,13)" -ForegroundColor Gray
         Write-Host "                                                                       Press " -NoNewline -ForegroundColor DarkRed
         Write-Host "[C]" -NoNewline -ForegroundColor DarkGreen
-        Write-Host " - Crawling & Discovery (9,10,11,12)" -ForegroundColor Gray
+        Write-Host " - Content Discovery (10,11,12,14)" -ForegroundColor Gray
         Write-Host "                                                                       Press " -NoNewline -ForegroundColor DarkRed
         Write-Host "[S]" -NoNewline -ForegroundColor DarkGreen
-        Write-Host " - Security & Infra (2,7,12)" -ForegroundColor Gray
+        Write-Host " - Security Audit (2,4,7,8,13)" -ForegroundColor Gray
+        Write-Host "                                                                       Press " -NoNewline -ForegroundColor DarkRed
+        Write-Host "[T]" -NoNewline -ForegroundColor DarkGreen
+        Write-Host " - Stealth Mode (1,2,3,5,6,11,12)" -ForegroundColor Gray
+        Write-Host "                                                                       Press " -NoNewline -ForegroundColor DarkRed
+        Write-Host "[P]" -NoNewline -ForegroundColor DarkGreen
+        Write-Host " - Penetration Test (1,2,3,4,5,6,7,10,11,12,13,14)" -ForegroundColor Gray
         Write-Host "                                                                       Press " -NoNewline -ForegroundColor DarkRed
         Write-Host "[A]" -NoNewline -ForegroundColor DarkGreen
-        Write-Host " - Active All (1 to 12)" -ForegroundColor Gray
+        Write-Host " - Active All (1 to 14)" -ForegroundColor Gray
         Write-Host "`n`n`n                                   - Enter the number corresponding to the function you want to Enable or Disable or Select Preset's`n" -ForegroundColor Yellow
         $input = Show-InputPrompt -input_name "  Press [Enter] to Save and exit" -PaddingLeft 25 -QuestionColor Green
         
@@ -1317,55 +1325,90 @@ function Configure-ScansInteractive {
         }
         
         switch ($input.ToUpper()) {
-            # === Atalhos para grupos ===
-            'W' {
-                # Desliga todos
+            # === PRESETS ===
+            'B' {
+                # BASIC RECON - Para iniciantes/resultados rápidos
                 for ($i = 0; $i -lt $scans.Count; $i++) {
                     $scans[$i].Enabled = 0
                 }
-                # Liga só os do preset
-                $preset = 1,3,5,6
+                $preset = 1,2,3,5,6
                 foreach ($i in $preset) { $scans[$i-1].Enabled = 1 }
-                Write-Host "`nWeb checks enabled (HTTP, Title, Methods, Headers)" -ForegroundColor Green
+                Write-Host "`nBasic Recon enabled (Status, Title, IP, Headers, Technologies)" -ForegroundColor Green
                 Start-Sleep -Seconds 1
                 continue
             }
-            'D' {
+            'W' {
+                # WEB APPLICATION - Foco em aplicações web
                 for ($i = 0; $i -lt $scans.Count; $i++) {
                     $scans[$i].Enabled = 0
                 }
-                $preset = 4,8
+                $preset = 1,2,4,5,6,10
                 foreach ($i in $preset) { $scans[$i-1].Enabled = 1 }
-                Write-Host "`nDNS & Network scans enabled" -ForegroundColor Green
+                Write-Host "`nWeb Application scans enabled" -ForegroundColor Green
+                Start-Sleep -Seconds 1
+                continue
+            }
+            'N' {
+                # NETWORK & DNS - Infraestrutura de rede
+                for ($i = 0; $i -lt $scans.Count; $i++) {
+                    $scans[$i].Enabled = 0
+                }
+                $preset = 3,8,9,13
+                foreach ($i in $preset) { $scans[$i-1].Enabled = 1 }
+                Write-Host "`nNetwork & DNS scans enabled" -ForegroundColor Green
                 Start-Sleep -Seconds 1
                 continue
             }
             'C' {
+                # CONTENT DISCOVERY - Enumerar conteúdo
                 for ($i = 0; $i -lt $scans.Count; $i++) {
                     $scans[$i].Enabled = 0
                 }
-                $preset = 9,10,11,12
+                $preset = 10,11,12,14
                 foreach ($i in $preset) { $scans[$i-1].Enabled = 1 }
-                Write-Host "`nCrawling & Discovery scans enabled" -ForegroundColor Green
+                Write-Host "`nContent Discovery scans enabled" -ForegroundColor Green
                 Start-Sleep -Seconds 1
                 continue
             }
             'S' {
+                # SECURITY AUDIT - Verificações de segurança
                 for ($i = 0; $i -lt $scans.Count; $i++) {
                     $scans[$i].Enabled = 0
                 }
-                $preset = 2,7,12
+                $preset = 2,4,7,8,13
                 foreach ($i in $preset) { $scans[$i-1].Enabled = 1 }
-                Write-Host "`nSecurity & Infra scans enabled" -ForegroundColor Green
+                Write-Host "`nSecurity Audit scans enabled" -ForegroundColor Green
+                Start-Sleep -Seconds 1
+                continue
+            }
+            'T' {
+                # 🕵️‍♂️ STEALTH MODE - Novo preset furtivo
+                for ($i = 0; $i -lt $scans.Count; $i++) {
+                    $scans[$i].Enabled = 0
+                }
+                $preset = 1,2,3,5,6,11,12
+                foreach ($i in $preset) { $scans[$i-1].Enabled = 1 }
+                Write-Host "`nStealth Mode enabled (Minimal detection, max information)" -ForegroundColor Green
+                Start-Sleep -Seconds 1
+                continue
+            }
+            'P' {
+                # PENETRATION TEST - Scan agressivo completo
+                for ($i = 0; $i -lt $scans.Count; $i++) {
+                    $scans[$i].Enabled = 0
+                }
+                $preset = 1,2,3,4,5,6,7,10,11,12,13,14
+                foreach ($i in $preset) { $scans[$i-1].Enabled = 1 }
+                Write-Host "`nPenetration Testing scans enabled" -ForegroundColor Green
                 Start-Sleep -Seconds 1
                 continue
             }
             'A' {
-                # Aqui liga tudo mesmo
+                # ACTIVE ALL - Tudo mesmo (máximo ruído)
                 for ($i = 0; $i -lt $scans.Count; $i++) {
                     $scans[$i].Enabled = 1
                 }
-                Write-Host "`nAll scans enabled (1 to 12)" -ForegroundColor Green
+                Write-Host "`nAll scans enabled (1 to 14)" -ForegroundColor Green
                 Start-Sleep -Seconds 1
                 continue
             }
@@ -1392,6 +1435,7 @@ function Configure-ScansInteractive {
         }
     }
 }
+
 # =============================================
 # FUNÇÕES DE EXECUÇÃO E MENU
 # =============================================
@@ -1439,7 +1483,7 @@ function RunAllScans {
     $leftPaddingBase = [Math]::Max(0, [Math]::Floor(($width - $blockWidth) / 2))
 
     # EXIBE O MENU DOS SCANS (igual ao Configure-ScansInteractive)
-    Write-Host "`n`n                                                                                 Scan Selecionados:`n" -ForegroundColor DarkRed
+    Write-Host "`n`n                                                                                 Scan Selected's:`n" -ForegroundColor DarkRed
     
     for ($i = 0; $i -lt $scansForDisplay.Count; $i++) {
         $scan = $scansForDisplay[$i]
@@ -1626,7 +1670,7 @@ function PowerDiNSpec {
             "Security Headers Analysis",
             "Detect Technologies in Use",
             "DNS Zone Transfer Test",
-            "Comprehensive DNS Records",
+            "Check DNS Records",
             "List Links Found in HTML", 
             "Check the robots.txt File",
             "Check if Site has a Sitemap",
