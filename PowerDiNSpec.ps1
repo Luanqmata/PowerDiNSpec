@@ -652,9 +652,18 @@ Connection: close`r`n
     }
     function Write-Log {
         param ([string]$message, [string]$level = "INFO")
+        
         $timestamp = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
         $logMessage = "[$timestamp] [$level] $message"
-        Add-Content -Path $logFile -Value $logMessage
+        
+        $logDir = "Logs_PowerDns"
+        if (-not (Test-Path $logDir)) {
+            New-Item -ItemType Directory -Path $logDir -Force | Out-Null
+        }
+        
+        $logFilePath = Join-Path $logDir $logFile
+        
+        Add-Content -Path $logFilePath -Value $logMessage
     }
 
     # === Funcoes de Scan ===
@@ -1009,7 +1018,7 @@ Connection: close`r`n
         $uri = [System.Uri]$url
         $CleanHost = $uri.Host
         
-        Write-Host "    Scanning ports: `n  $($global:PortsForBannerScan -join ', ')`n" -ForegroundColor White
+        Write-Host "    Scanning ports: `n [ $($global:PortsForBannerScan -join ', ') ]`n" -ForegroundColor White
         
         # Define portas web para usar Test-HttpService
         $webPorts = @(80, 443, 8080, 8443, 8888, 9080, 9090, 8000, 3000, 5000, 7443, 9443)
@@ -1186,7 +1195,6 @@ Connection: close`r`n
                         Select-Object -Unique |
                         Sort-Object
 
-            # Filter common words
             $commonWords = @('n0n9')
             $palavras = $palavras | Where-Object { $commonWords -notcontains $_.ToLower() }
 
@@ -1194,7 +1202,6 @@ Connection: close`r`n
             Write-Log "Found $($palavras.Count) unique words for fuzzing"
 
             if ($palavras.Count -gt 0) {
-                # Show example words
                 Write-Host "`nExample of found words (first 10):" -ForegroundColor Yellow
                 $palavras | Select-Object -First 10 | ForEach-Object {
                     Write-Host "   $_" -ForegroundColor White
@@ -1203,8 +1210,7 @@ Connection: close`r`n
                 $save = Read-Host "`nDo you want to save the words to a file for fuzzing? (Y/N)"
 
                 if ($save -eq 'Y' -or $save -eq 'y') {
-                    # Cria a pasta fuzzing_words se não existir
-                    $fuzzingDir = "words_4_fuzz"
+                    $fuzzingDir = "Fuzz_files"
                     if (-not (Test-Path $fuzzingDir)) {
                         New-Item -ItemType Directory -Path $fuzzingDir -Force | Out-Null
                         Write-Host "`nCreated directory: $fuzzingDir" -ForegroundColor Green
@@ -1213,10 +1219,9 @@ Connection: close`r`n
                     $filePath = Read-Host "`nEnter the file name (default: words_fuzzing.txt)"
 
                     if ([string]::IsNullOrEmpty($filePath)) {
-                        $filePath = "words_fuzzing.txt"
+                        $filePath = "fuzz_words_formated.txt"
                     }
                     
-                    # Salva dentro da pasta fuzzing_words
                     $fullPath = Join-Path $fuzzingDir $filePath
                     $palavras | Out-File -FilePath $fullPath -Encoding UTF8
                     
@@ -1328,129 +1333,123 @@ Connection: close`r`n
     function Help {
         Clear-Host
         Logo_Menu
-        Write-Host "`n                                                                          ==== HELP ====`n" -ForegroundColor Red
+        Write-Host "`n                                                                          ==== HELP - PowerDiNSpec v2.1.9 ====`n" -ForegroundColor Red
 
         Write-Host "`n  POWERDINSPEC - PowerShell DNS Recon Tool" -ForegroundColor Yellow
-        Write-Host "`n  PowerDiNSpec is a PowerShell-based reconnaissance toolkit for websites" -ForegroundColor White
-        Write-Host "  and DNS records. It is intended for security researchers, pentesters and" -ForegroundColor White
-        Write-Host "  lab use. This help section is intentionally long and detailed. Read it" -ForegroundColor White
-        Write-Host "  carefully. You will see repeated emphasis on ethics, scope and proper use." -ForegroundColor White
-
+        Write-Host "`n  PowerDiNSpec is a comprehensive PowerShell-based reconnaissance toolkit for" -ForegroundColor White
+        Write-Host "  websites and DNS infrastructure. Designed for security professionals, researchers," -ForegroundColor White
+        Write-Host "  and penetration testers conducting authorized security assessments." -ForegroundColor White
         Write-Host "`n  OVERVIEW" -ForegroundColor Cyan
-        Write-Host "    PowerDiNSpec automates a sequence of reconnaissance tasks against a" -ForegroundColor White
-        Write-Host "    specified URL or host. Each check is non-invasive by design but may" -ForegroundColor White
-        Write-Host "    still trigger alarms on remote systems. Use with authorization." -ForegroundColor White
-
-        Write-Host "`n  FEATURES (DETAILED)" -ForegroundColor Cyan
-        Write-Host "    - Capture server headers:" -ForegroundColor White
-        Write-Host "        Retrieves HTTP response headers and common server header fields" -ForegroundColor White
-        Write-Host "        such as Server, X-Powered-By and other header values useful for" -ForegroundColor White
-        Write-Host "        fingerprinting server software and versions." -ForegroundColor White
-        Write-Host ""
-        Write-Host "    - Discover allowed HTTP methods:" -ForegroundColor White
-        Write-Host "        Enumerates HTTP methods reported by the target and reports methods" -ForegroundColor White
-        Write-Host "        like GET, POST, OPTIONS, HEAD, PUT, DELETE, TRACE and others." -ForegroundColor White
-        Write-Host ""
-        Write-Host "    - List links found in HTML:" -ForegroundColor White
-        Write-Host "        Parses HTML content and extracts href/src links. This helps map" -ForegroundColor White
-        Write-Host "        internal pages, external references and potential attack surface." -ForegroundColor White
-        Write-Host ""
-        Write-Host "    - Extract words from HTML for fuzzing:" -ForegroundColor White
-        Write-Host "        Collects words and tokens from page HTML to compose wordlists for" -ForegroundColor White
-        Write-Host "        fuzzing, brute force or directory discovery tools in your workflow." -ForegroundColor White
-        Write-Host ""
-        Write-Host "    - Detect technologies in use:" -ForegroundColor White
-        Write-Host "        Attempts to infer frameworks, libraries and server software using" -ForegroundColor White
-        Write-Host "        header values and heuristics. Useful to guide follow-up testing." -ForegroundColor White
-        Write-Host ""
-        Write-Host "    - Get HTTP status codes:" -ForegroundColor White
-        Write-Host "        Shows the HTTP status code(s) returned by the target for the" -ForegroundColor White
-        Write-Host "        requested resource. Includes handling of redirects and final code." -ForegroundColor White
-        Write-Host ""
-        Write-Host "    - Search for IP addresses (DNS lookup):" -ForegroundColor White
-        Write-Host "        Retrieves IPv4 (A) and IPv6 (AAAA) addresses for the given domain." -ForegroundColor White
-        Write-Host "        Displays the found IPs or indicates if none are available." -ForegroundColor White
-        Write-Host ""
-        Write-Host "    - Retrieve <title> of the page:" -ForegroundColor White
-        Write-Host "        Reads the HTML title element to capture target page title metadata." -ForegroundColor White
-        Write-Host ""
-        Write-Host "    - Check robots.txt and sitemap.xml:" -ForegroundColor White
-        Write-Host "        Fetches and shows robots.txt and sitemap.xml when present. These" -ForegroundColor White
-        Write-Host "        files often reveal allowed/disallowed paths and sitemap locations." -ForegroundColor White
-        Write-Host ""
-        Write-Host "    - Capture service banners (ports):" -ForegroundColor White
-        Write-Host "        Optionally connects to given ports to read plaintext banners and" -ForegroundColor White
-        Write-Host "        service identifiers (when available)." -ForegroundColor White
-        Write-Host ""
-        Write-Host "    - Check DNS records for a domain:" -ForegroundColor White
-        Write-Host "        Retrieves DNS information including MX, NS, SOA, CNAME, TXT records," -ForegroundColor White
-        Write-Host "        and performs reverse lookup (PTR) for associated IP addresses." -ForegroundColor White
-        Write-Host "        Provides detailed output for each record type when available." -ForegroundColor White
-        Write-Host ""
-        Write-Host "    - Run All Scans (aggregate):" -ForegroundColor White
-        Write-Host "        Executes a sequential run of the major checks and compiles results." -ForegroundColor White
-        Write-Host ""
-        Write-Host "    - Logging:" -ForegroundColor White
-        Write-Host "        All actions, responses and summaries are written to a timestamped" -ForegroundColor White
-        Write-Host "        log file in the script directory for later review and auditing." -ForegroundColor White
-
+        Write-Host "    PowerDiNSpec automates multiple reconnaissance techniques against web targets," -ForegroundColor White
+        Write-Host "    providing essential information gathering capabilities for security assessments." -ForegroundColor White
+        Write-Host "    Each scan is designed to be non-invasive but may trigger security monitoring." -ForegroundColor White
+        Write-Host "`n  CORE FEATURES" -ForegroundColor Cyan   
+        Write-Host "`n    [1] HTTP Status Code Analysis" -ForegroundColor Green
+        Write-Host "        Retrieves and analyzes HTTP response codes to understand server behavior" -ForegroundColor White
+        Write-Host "        and identify potential issues or redirect patterns." -ForegroundColor Gray
+        Write-Host "`n    [2] Page Title Extraction" -ForegroundColor Green
+        Write-Host "        Extracts and displays the HTML page title for quick content identification" -ForegroundColor White
+        Write-Host "        and target verification." -ForegroundColor Gray
+        Write-Host "`n    [3] DNS IP Resolution" -ForegroundColor Green
+        Write-Host "        Performs comprehensive DNS lookups for both IPv4 (A) and IPv6 (AAAA)" -ForegroundColor White
+        Write-Host "        records, revealing the target's IP infrastructure." -ForegroundColor Gray
+        Write-Host "`n    [4] HTTP Methods Discovery" -ForegroundColor Green
+        Write-Host "        Enumerates allowed HTTP methods (GET, POST, PUT, DELETE, OPTIONS, etc.)" -ForegroundColor White
+        Write-Host "        to identify potential attack vectors and server configuration." -ForegroundColor Gray
+        Write-Host "`n    [5] Server Headers Analysis" -ForegroundColor Green
+        Write-Host "        Captures and analyzes HTTP response headers including Server, X-Powered-By," -ForegroundColor White
+        Write-Host "        and other security-related headers for technology fingerprinting." -ForegroundColor Gray
+        Write-Host "`n    [6] Technology Detection" -ForegroundColor Green
+        Write-Host "        Identifies web technologies, frameworks, and server software through" -ForegroundColor White
+        Write-Host "        header analysis and response patterns." -ForegroundColor Gray
+        Write-Host "`n    [7] Comprehensive DNS Records" -ForegroundColor Green
+        Write-Host "        Extensive DNS reconnaissance including:" -ForegroundColor White
+        Write-Host "        - MX Records  - Mail server information" -ForegroundColor Gray
+        Write-Host "        - NS Records  - Name servers" -ForegroundColor Gray
+        Write-Host "        - SOA Records - Zone authority information" -ForegroundColor Gray
+        Write-Host "        - CNAME Records - Canonical name mappings" -ForegroundColor Gray
+        Write-Host "        - TXT Records - SPF, DKIM, verification records" -ForegroundColor Gray
+        Write-Host "        - PTR Records - Reverse DNS lookups" -ForegroundColor Gray
+        Write-Host "`n    [8] HTML Link Discovery" -ForegroundColor Green
+        Write-Host "        Extracts all HTTP/HTTPS links from page content to map internal and" -ForegroundColor White
+        Write-Host "        external resources and identify potential attack surface." -ForegroundColor Gray
+        Write-Host "`n    [9] Robots.txt Analysis" -ForegroundColor Green
+        Write-Host "        Retrieves and analyzes robots.txt files to discover hidden directories," -ForegroundColor White
+        Write-Host "        disallowed paths, and potential sensitive areas." -ForegroundColor Gray
+        Write-Host "`n    [10] Sitemap Discovery" -ForegroundColor Green
+        Write-Host "        Checks for sitemap.xml files to understand site structure and" -ForegroundColor White
+        Write-Host "        discover additional content paths." -ForegroundColor Gray
+        Write-Host "`n    [11] Port Banner Grabbing" -ForegroundColor Green
+        Write-Host "        Advanced service detection on multiple ports with configurable presets:" -ForegroundColor White
+        Write-Host "        - Common Services (21,22,80,443, etc.)" -ForegroundColor Gray
+        Write-Host "        - Web Services (80,443,8080,8443, etc.)" -ForegroundColor Gray
+        Write-Host "        - Database Ports (1433,1521,3306,5432, etc.)" -ForegroundColor Gray
+        Write-Host "        - Email Services (25,110,143,465, etc.)" -ForegroundColor Gray
+        Write-Host "        - Custom port ranges supported" -ForegroundColor Gray
+        Write-Host "`n    [12] Wordlist Generation for Fuzzing" -ForegroundColor Green
+        Write-Host "        Extracts unique words from HTML content to create customized wordlists" -ForegroundColor White
+        Write-Host "        for directory brute-forcing, fuzzing, and content discovery." -ForegroundColor Gray
+        Write-Host "`n    [13] Run All Scans" -ForegroundColor Green
+        Write-Host "        Executes a comprehensive sequential assessment using all enabled scans" -ForegroundColor White
+        Write-Host "        with configurable options and real-time progress display." -ForegroundColor Gray
+        Write-Host "`n  CONFIGURATION FEATURES" -ForegroundColor Cyan
+        Write-Host "    - Customizable scan selection and prioritization" -ForegroundColor White
+        Write-Host "    - Configurable port ranges for banner grabbing" -ForegroundColor White
+        Write-Host "    - Preset configurations for different assessment types" -ForegroundColor White
+        Write-Host "    - Interactive configuration menus" -ForegroundColor White
+        Write-Host "`n  OUTPUT & LOGGING" -ForegroundColor Cyan
+        Write-Host "    - Structured console output with color coding" -ForegroundColor White
+        Write-Host "    - Comprehensive log files with timestamps" -ForegroundColor White
+        Write-Host "    - Automatic directory organization:" -ForegroundColor White
+        Write-Host "      - Logs_PowerDns/ - Scan logs and activity records" -ForegroundColor Gray
+        Write-Host "      - Fuzz_files/    - Generated wordlists for fuzzing" -ForegroundColor Gray
         Write-Host "`n  SECURITY, ETHICS AND LEGAL NOTICE" -ForegroundColor Yellow
-        Write-Host "    PowerDiNSpec is provided for educational, research and authorized" -ForegroundColor White
-        Write-Host "    security testing only. Running scans or probes against systems you do" -ForegroundColor White
-        Write-Host "    not own or do not have explicit permission to test may be illegal and" -ForegroundColor White
-        Write-Host "    could expose you to civil or criminal liability." -ForegroundColor White
-        Write-Host ""
-        Write-Host "    You must obtain written authorization before scanning third-party" -ForegroundColor White
-        Write-Host "    targets. Always follow your organization or client rules of engagement." -ForegroundColor White
-        Write-Host ""
-        Write-Host "    Repeated reminder: USE THIS TOOL ONLY WITH AUTHORIZATION." -ForegroundColor Red
-        Write-Host "    Use of the tool without authorization is strictly prohibited." -ForegroundColor Red
-
-        Write-Host "`n  INSTALLATION & PREREQUISITES" -ForegroundColor Cyan
-        Write-Host "    - Windows with PowerShell 5.1 or later is required." -ForegroundColor White
-        Write-Host "    - Clone or download the repository to a local folder." -ForegroundColor White
-        Write-Host "      Example: git clone https://github.com/Luanqmata/PowerDiNSpec.git" -ForegroundColor White
-        Write-Host "    - Change to the repository folder: cd PowerDiNSpec" -ForegroundColor White
-        Write-Host "    - Unlock script execution if required (adjust ExecutionPolicy as needed)." -ForegroundColor White
-        Write-Host "    - Ensure network connectivity and DNS resolution for the target hosts." -ForegroundColor White
-
-        Write-Host "`n  EXAMPLE: RUNNING ALL SCANS" -ForegroundColor Cyan
-        Write-Host "    - From the main menu choose the option that runs all scans (Run All)." -ForegroundColor White
-        Write-Host "    - Enter the target URL when requested (for example: https://example.com)." -ForegroundColor White
-        Write-Host "    - The tool will perform the sequence of checks and append output to" -ForegroundColor White
-        Write-Host "      the log file. Review logs for details and follow-up tasks." -ForegroundColor White
-
-        Write-Host "`n  LOGGING & OUTPUT" -ForegroundColor Cyan
-        Write-Host "    - Logs are written to the script directory with timestamps in filenames." -ForegroundColor White
-        Write-Host "    - Each run appends a summary header and the raw outputs for each check." -ForegroundColor White
-        Write-Host "    - Use the logs for audit, reporting and reproduction of findings." -ForegroundColor White
-
+        Write-Host "    [IMPORTANT] USE ONLY WITH EXPLICIT AUTHORIZATION" -ForegroundColor Red
+        Write-Host "" -ForegroundColor White
+        Write-Host "    PowerDiNSpec is designed for:" -ForegroundColor White
+        Write-Host "    - Authorized penetration testing" -ForegroundColor Gray
+        Write-Host "    - Security research and education" -ForegroundColor Gray
+        Write-Host "    - Internal security assessments" -ForegroundColor Gray
+        Write-Host "    - Bug bounty programs with explicit scope" -ForegroundColor Gray
+        Write-Host "" -ForegroundColor White
+        Write-Host "    STRICTLY PROHIBITED:" -ForegroundColor Red
+        Write-Host "    - Scanning systems without explicit written permission" -ForegroundColor Gray
+        Write-Host "    - Testing outside of authorized scope" -ForegroundColor Gray
+        Write-Host "    - Malicious or unauthorized activities" -ForegroundColor Gray
+        Write-Host "" -ForegroundColor White
+        Write-Host "    You are solely responsible for ensuring proper authorization and" -ForegroundColor White
+        Write-Host "    compliance with all applicable laws and regulations." -ForegroundColor White
+        Write-Host "`n  INSTALLATION & USAGE" -ForegroundColor Cyan
+        Write-Host "    Requirements:" -ForegroundColor White
+        Write-Host "    - Windows PowerShell 5.1 or newer" -ForegroundColor Gray
+        Write-Host "    - Internet connectivity for target access" -ForegroundColor Gray
+        Write-Host "    - Appropriate execution policy settings" -ForegroundColor Gray
+        Write-Host "" -ForegroundColor White
+        Write-Host "    Quick Start:" -ForegroundColor White
+        Write-Host "    1. Configure scans (Option 0 -> Configure Scans)" -ForegroundColor Gray
+        Write-Host "    2. Set port ranges (Option 0 -> Configure Ports)" -ForegroundColor Gray
+        Write-Host "    3. Run individual scans or complete assessment" -ForegroundColor Gray
+        Write-Host "    4. Review logs in Logs_PowerDns/ directory" -ForegroundColor Gray
         Write-Host "`n  CREDITS" -ForegroundColor Cyan
         Write-Host "    - Author: Luan Calazans (2025)" -ForegroundColor White
         Write-Host "    - PowerShell-based toolkit design and implementation: Luan Calazans" -ForegroundColor White
         Write-Host "    - Menu ASCII fonts and artwork assistance: WriteAscii project" -ForegroundColor White
         Write-Host "      Font and artwork source: https://github.com/EliteLoser/WriteAscii/blob/master/letters.xml" -ForegroundColor White
         Write-Host "    - Please respect the original font/artwork author and license when" -ForegroundColor White
-
-        Write-Host "`n  FULL DISCLAIMER" -ForegroundColor Yellow
-        Write-Host "    PowerDiNSpec is distributed without any warranty. The author is not" -ForegroundColor White
-        Write-Host "    responsible for misuse or damage caused by this tool. You assume all" -ForegroundColor White
-        Write-Host "    responsibility for its use." -ForegroundColor White
-
-        Write-Host "`n  SUPPORT & REPOSITORY" -ForegroundColor Cyan
-        Write-Host "    - GitHub: https://github.com/Luanqmata/PowerDiNSpec" -ForegroundColor White
-        Write-Host "    - Issues, feature requests and contributions are welcome via the" -ForegroundColor White
-        Write-Host "      repository issue tracker." -ForegroundColor White
-
-        Write-Host "`n  REMARK: THIS HELP IS INTENTIONALLY VERBOSE" -ForegroundColor Red
-        Write-Host "    You have just read a long help section. It is intentionally wordy" -ForegroundColor White
-        Write-Host "    to ensure users pay attention to ethics, usage rules, and details." -ForegroundColor White
-        Write-Host "    REREAD THE SECTIONS ABOVE IF NECESSARY." -ForegroundColor White
+        Write-Host "`n  LICENSE" -ForegroundColor Cyan
+        Write-Host "    GNU Affero General Public License v3.0" -ForegroundColor White
+        Write-Host "    This program is free software: you can redistribute it and/or modify" -ForegroundColor Gray
+        Write-Host "    it under the terms of the GNU AGPLv3. See LICENSE file for details." -ForegroundColor Gray
+        Write-Host "`n  REPOSITORY & SUPPORT" -ForegroundColor Cyan
+        Write-Host "    GitHub: https://github.com/Luanqmata/PowerDiNSpec" -ForegroundColor White
+        Write-Host "    Issues and contributions welcome via GitHub repository." -ForegroundColor Gray
+        Write-Host "`n  FINAL REMINDER" -ForegroundColor Red
+        Write-Host "    USE RESPONSIBLY - GET AUTHORIZATION - RESPECT PRIVACY - FOLLOW ETHICS" -ForegroundColor Yellow
+        Write-Host "    This tool is for defensive security purposes only." -ForegroundColor White
 
         Write-Host "`n  Press Enter to return to the submenu..." -ForegroundColor DarkGray
         $null = Read-Host
     }
-
 
 # === Menu Principal ===
 while ($true) {
