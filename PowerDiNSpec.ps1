@@ -385,6 +385,7 @@ function Handle-WebError {
         Write-Log "Erro: $($ErrorObject.Exception.Message)" "ERROR"
     }
 }
+
 function Write-Log {
     param ([string]$message, [string]$level = "INFO")
     
@@ -409,12 +410,38 @@ function ScanStatusCode {
     try {
         Write-Host "`n Obtaining HTTP status code..." -ForegroundColor Yellow
         Write-Log "Starting ScanStatusCode for: $url"
+        
         $response = Invoke-WebRequestSafe -Uri $url
+        $statusCode = $response.StatusCode
+        $statusDescription = $response.StatusDescription
+        
         Write-Host "`nStatus Code:" -ForegroundColor Green
-        $response.StatusCode
-        Write-Log "Status Code: $($response.StatusCode)"
+        Write-Host "  $statusCode $statusDescription" -ForegroundColor White
+        
+        $color = switch ($statusCode) {
+            { $_ -ge 200 -and $_ -lt 300 } { "Green"; break }
+            { $_ -ge 300 -and $_ -lt 400 } { "Yellow"; break }
+            { $_ -ge 400 -and $_ -lt 500 } { "Red"; break }
+            { $_ -ge 500 } { "DarkRed"; break }
+            default { "White" }
+        }
+        
+        Write-Host "Category: $(Get-HTTPStatusCategory -StatusCode $statusCode)" -ForegroundColor $color
+        Write-Log "Status Code: $statusCode $statusDescription"
+        
     } catch {
         Handle-WebError -ErrorObject $_
+    }
+}
+function Get-HTTPStatusCategory {
+    param([int]$StatusCode)
+    switch ($StatusCode) {
+        { $_ -ge 100 -and $_ -lt 200 } { return "Informational" }
+        { $_ -ge 200 -and $_ -lt 300 } { return "Success" }
+        { $_ -ge 300 -and $_ -lt 400 } { return "Redirection" }
+        { $_ -ge 400 -and $_ -lt 500 } { return "Client Error" }
+        { $_ -ge 500 } { return "Server Error" }
+        default { return "Unknown" }
     }
 }
 
@@ -426,11 +453,16 @@ function ScanTitle {
         
         $response = Invoke-WebRequestSafe -Uri $url
         if ($response -and $response.ParsedHtml -and $response.ParsedHtml.title) {
+            $title = $response.ParsedHtml.title.Trim()
             Write-Host "`nPage title:" -ForegroundColor Green
-            $response.ParsedHtml.title
-            Write-Log "Page title: $($response.ParsedHtml.title)"
+            Write-Host "  $title" -ForegroundColor White
+            Write-Log "Page title: $title"
+            
+            Write-Host "`nTitle Analysis:" -ForegroundColor Cyan
+            Write-Host "  Length: $($title.Length) characters" -ForegroundColor Gray
         } else {
-            Write-Host "`nNo title found." -ForegroundColor Red
+            Write-Host "`nNo title found or title is empty." -ForegroundColor Red
+            Write-Log "No title found for: $url" "WARNING"
         }
     } catch {
         Handle-WebError -ErrorObject $_
@@ -444,37 +476,81 @@ function ScanOptions {
         Write-Log "Starting ScanOptions for: $url"
 
         $response = Invoke-WebRequestSafe -Uri $url -Method Options
-        Write-Host "`n Methods allowed by the server:" -ForegroundColor Green
+        
+        Write-Host "`nHTTP Methods Analysis:" -ForegroundColor Green
+        
         if ($response.Headers.Allow) {
-            $response.Headers.Allow
+            $methods = $response.Headers.Allow -split ', ' | Sort-Object
+            Write-Host "  $($methods -join ', ')" -ForegroundColor White
+            
+            $riskyMethods = @('PUT', 'DELETE', 'TRACE', 'CONNECT')
+            $foundRisky = $methods | Where-Object { $riskyMethods -contains $_ }
+            
+            if ($foundRisky) {
+                Write-Host "`n  Risky Methods Found: $($foundRisky -join ', ')" -ForegroundColor Red
+                Write-Log "Risky HTTP methods detected: $($foundRisky -join ', ')" "WARNING"
+            }
+            
             Write-Log "Allowed methods: $($response.Headers.Allow)"
         } else {
-            Write-Host "No Allow header found in the response." -ForegroundColor Red
+            Write-Host "  No Allow header found in response." -ForegroundColor Yellow
         }
+
+        $relevantHeaders = @('Access-Control-Allow-Methods', 'Access-Control-Allow-Origin', 'Access-Control-Allow-Headers')
+        foreach ($header in $relevantHeaders) {
+            if ($response.Headers[$header]) {
+                Write-Host "  $header : $($response.Headers[$header])" -ForegroundColor Cyan
+            }
+        }
+        
     } catch {
         Handle-WebError -ErrorObject $_
     }
 }
-
 function ScanHeaders {
     param ([string]$url)
     try {
-        Write-Host "`n Scanning Headers..." -ForegroundColor Yellow
+        Write-Host "`n Scanning Server Headers..." -ForegroundColor Yellow
         Write-Log "Starting ScanHeaders for: $url"
 
         $response = Invoke-WebRequestSafe -Uri $url -Method Head
-        Write-Host "`n The server is running:" -ForegroundColor Green
+        
+        Write-Host "`nServer Information:" -ForegroundColor Green
+        
         if ($response.Headers.Server) {
-            $response.Headers.Server
-            Write-Log "Server header: $($response.Headers.Server)"
+            $serverInfo = $response.Headers.Server
+            Write-Host "  Server: $serverInfo" -ForegroundColor White
+            
+            if ($serverInfo -match 'Apache') {
+                Write-Host "  Type: Apache Web Server" -ForegroundColor Cyan
+            } elseif ($serverInfo -match 'nginx') {
+                Write-Host "  Type: Nginx Web Server" -ForegroundColor Cyan
+            } elseif ($serverInfo -match 'IIS') {
+                Write-Host "  Type: Microsoft IIS" -ForegroundColor Cyan
+            }
+            
+            Write-Log "Server header: $serverInfo"
         } else {
-            Write-Host "Server header not found." -ForegroundColor Red
+            Write-Host "  Server header not found or hidden." -ForegroundColor Yellow
         }
+        
+        $importantHeaders = @{
+            'X-Powered-By' = 'Application Framework'
+            'X-AspNet-Version' = 'ASP.NET Version'
+            'X-AspNetMvc-Version' = 'ASP.NET MVC Version'
+            'X-Runtime' = 'Runtime Environment'
+        }
+        
+        foreach ($header in $importantHeaders.GetEnumerator()) {
+            if ($response.Headers[$header.Key]) {
+                Write-Host "  $($header.Value): $($response.Headers[$header.Key])" -ForegroundColor White
+            }
+        }
+        
     } catch {
         Handle-WebError -ErrorObject $_
     }
-}    
-
+}
 function ScanTech {
     param ([string]$url)
     try {
@@ -482,44 +558,61 @@ function ScanTech {
         Write-Log "Starting ScanTech for: $url"
 
         $response = Invoke-WebRequestSafe -Uri $url
-        $techDetected = $false
+        $technologies = @()
+        
+        Write-Host "`nDetected Technologies:" -ForegroundColor Green
 
-        if ($response.Headers["x-powered-by"]) {
-            Write-Host "`nTechnology detected (X-Powered-By):" -ForegroundColor Green
-            $response.Headers["x-powered-by"]
-            Write-Log "Technology detected (X-Powered-By): $($response.Headers['x-powered-by'])"
-            $techDetected = $true
+        $techHeaders = @(
+            @{Header = "x-powered-by"; Name = "Backend Framework"},
+            @{Header = "x-aspnet-version"; Name = "ASP.NET Version"}, 
+            @{Header = "x-aspnetmvc-version"; Name = "ASP.NET MVC Version"},
+            @{Header = "x-generator"; Name = "CMS/Generator"},
+            @{Header = "x-drupal-cache"; Name = "Drupal"},
+            @{Header = "x-joomla"; Name = "Joomla"},
+            @{Header = "wp-super-cache"; Name = "WordPress Cache"}
+        )
+
+        foreach ($tech in $techHeaders) {
+            if ($response.Headers[$tech.Header]) {
+                $value = $response.Headers[$tech.Header]
+                Write-Host "  $($tech.Name): $value" -ForegroundColor White
+                $technologies += "$($tech.Name): $value"
+                Write-Log "Technology detected ($($tech.Name)): $value"
+            }
         }
 
-        if ($response.Headers["x-aspnet-version"]) {
-            Write-Host "`nASP.NET Version:" -ForegroundColor Green
-            $response.Headers["x-aspnet-version"]
-            Write-Log "ASP.NET Version: $($response.Headers['x-aspnet-version'])"
-            $techDetected = $true
+        # Content-based detection
+        if ($response.Content -match "wp-content|wp-includes") {
+            Write-Host "  CMS: WordPress (detected from content)" -ForegroundColor White
+            $technologies += "WordPress"
         }
 
-        if ($response.Headers["x-aspnetmvc-version"]) {
-            Write-Host "`nASP.NET MVC Version:" -ForegroundColor Green
-            $response.Headers["x-aspnetmvc-version"]
-            Write-Log "ASP.NET MVC Version: $($response.Headers['x-aspnetmvc-version'])"
-            $techDetected = $true
+        if ($response.Content -match "_wpnonce|woocommerce") {
+            Write-Host "  Plugin: WooCommerce" -ForegroundColor White
+            $technologies += "WooCommerce"
         }
 
-        if ($response.Headers["x-generator"]) {
-            Write-Host "`nCMS/Generator:" -ForegroundColor Green
-            $response.Headers["x-generator"]
-            Write-Log "CMS/Generator: $($response.Headers['x-generator'])"
-            $techDetected = $true
+        if ($response.Content -match "react|react-dom") {
+            Write-Host "  Frontend: React" -ForegroundColor White
+            $technologies += "React"
         }
 
-        if (-not $techDetected) {
-            Write-Host "`nNo additional technologies detected in the headers." -ForegroundColor Red
+        if ($response.Content -match "jquery") {
+            Write-Host "  JavaScript: jQuery" -ForegroundColor White
+            $technologies += "jQuery"
         }
+
+        if ($technologies.Count -eq 0) {
+            Write-Host "  No specific technologies detected in headers or content." -ForegroundColor Yellow
+            Write-Host "  Note: Many modern frameworks hide their fingerprints." -ForegroundColor Gray
+        } else {
+            Write-Host "`n  Total technologies found: $($technologies.Count)" -ForegroundColor DarkGreen
+        }
+
     } catch {
         Handle-WebError -ErrorObject $_
     }
 }
-
 function Test-SecurityHeaders {
     param([string]$url)
     
@@ -528,34 +621,54 @@ function Test-SecurityHeaders {
         Write-Log "Starting Security Headers check for: $url"
         
         $securityHeaders = @(
-            'Strict-Transport-Security',
-            'Content-Security-Policy', 
-            'X-Frame-Options',
-            'X-Content-Type-Options',
-            'X-XSS-Protection',
-            'Referrer-Policy',
-            'Permissions-Policy',
-            'X-Permitted-Cross-Domain-Policies'
+            @{Name = 'Strict-Transport-Security'; Importance = 'High'; Description = 'Enforces HTTPS connections'},
+            @{Name = 'Content-Security-Policy'; Importance = 'High'; Description = 'Prevents XSS attacks'}, 
+            @{Name = 'X-Frame-Options'; Importance = 'Medium'; Description = 'Prevents clickjacking'},
+            @{Name = 'X-Content-Type-Options'; Importance = 'Medium'; Description = 'Prevents MIME sniffing'},
+            @{Name = 'X-XSS-Protection'; Importance = 'Low'; Description = 'Legacy XSS protection'},
+            @{Name = 'Referrer-Policy'; Importance = 'Medium'; Description = 'Controls referrer information'},
+            @{Name = 'Permissions-Policy'; Importance = 'Medium'; Description = 'Controls browser features'},
+            @{Name = 'X-Permitted-Cross-Domain-Policies'; Importance = 'Low'; Description = 'Flash cross-domain policy'}
         )
         
         $response = Invoke-WebRequest -Uri $url -Method Head -TimeoutSec 10 -Headers $headers
         
-        Write-Host "`nSecurity Headers Analysis:" -ForegroundColor Green
-        
         $foundHeaders = 0
+        $missingCritical = @()
+        
         foreach ($header in $securityHeaders) {
-            if ($response.Headers[$header]) {
-                Write-Host "  $header : $($response.Headers[$header])" -ForegroundColor Green
-                Write-Log "Security Header found: $header = $($response.Headers[$header])"
+            if ($response.Headers[$header.Name]) {
+                $color = if ($header.Importance -eq 'High') { "Green" } else { "Cyan" }
+                Write-Host "  [PRESENT] $($header.Name)" -ForegroundColor $color
+                Write-Host "    Value: $($response.Headers[$header.Name])" -ForegroundColor White
+                Write-Host "    Purpose: $($header.Description)" -ForegroundColor Gray
                 $foundHeaders++
+                Write-Log "Security Header found: $($header.Name) = $($response.Headers[$header.Name])"
             } else {
-                Write-Host "  $header : Missing" -ForegroundColor Red
-                Write-Log "Security Header missing: $header" "WARNING"
+                $color = if ($header.Importance -eq 'High') { "Red" } else { "Yellow" }
+                Write-Host "  [MISSING] $($header.Name)" -ForegroundColor $color
+                Write-Host "    Importance: $($header.Importance)" -ForegroundColor Gray
+                Write-Host "    Purpose: $($header.Description)" -ForegroundColor Gray
+                
+                if ($header.Importance -eq 'High') {
+                    $missingCritical += $header.Name
+                }
+                
+                Write-Log "Security Header missing: $($header.Name)" "WARNING"
             }
+            Write-Host ""
         }
         
-        Write-Host "`n  Summary: $foundHeaders/$($securityHeaders.Count) security headers present" -ForegroundColor $(if ($foundHeaders -ge 5) { "Green" } else { "DarkRed" })
-        Write-Log "Security Headers check completed: $foundHeaders headers found"
+        # Security rating
+        $securityScore = [math]::Round(($foundHeaders / $securityHeaders.Count) * 100, 1)
+        Write-Host "  Security Headers Score: $securityScore%" -ForegroundColor $(if ($securityScore -ge 70) { "Green" } elseif ($securityScore -ge 40) { "Yellow" } else { "Red" })
+        Write-Host "  Found: $foundHeaders/$($securityHeaders.Count) security headers" -ForegroundColor White
+        
+        if ($missingCritical.Count -gt 0) {
+            Write-Host "`n  Critical headers missing: $($missingCritical -join ', ')" -ForegroundColor Red
+        }
+        
+        Write-Log "Security Headers check completed: $foundHeaders headers found, Score: $securityScore%"
         
     }
     catch {
@@ -563,7 +676,6 @@ function Test-SecurityHeaders {
         Write-Log "Security Headers check failed: $($_.Exception.Message)" "ERROR"
     }
 }
-
 function ScanLinks {
     param ([string]$url)
     try {
@@ -585,7 +697,6 @@ function ScanLinks {
         Handle-WebError -ErrorObject $_
     }
 }
-
 function ScanRobotsTxt {
     param ([string]$url)
     try {
@@ -594,11 +705,88 @@ function ScanRobotsTxt {
         
         $robotsUrl = "$url/robots.txt"
         $response = Invoke-WebRequestSafe -Uri $robotsUrl
-        Write-Host "`n Content robots.txt:" -ForegroundColor Green
-        Write-Host $response.Content
-        Write-Log "Robots.txt found and successfully read"
+        
+        $content = $response.Content.Trim()
+        $lines = $content -split "`n" | Where-Object { $_.Trim() -ne '' }
+
+        
+        if ($lines.Count -gt 0) {
+
+            $userAgents = $lines | Where-Object { $_ -match '^User-agent:' } | ForEach-Object { $_.Replace('User-agent:', '').Trim() }
+            $disallowed = $lines | Where-Object { $_ -match '^Disallow:' } | ForEach-Object { $_.Replace('Disallow:', '').Trim() }
+            $allowed = $lines | Where-Object { $_ -match '^Allow:' } | ForEach-Object { $_.Replace('Allow:', '').Trim() }
+            $sitemaps = $lines | Where-Object { $_ -match '^Sitemap:' } | ForEach-Object { $_.Replace('Sitemap:', '').Trim() }
+            $crawlDelays = $lines | Where-Object { $_ -match '^Crawl-delay:' } | ForEach-Object { $_.Replace('Crawl-delay:', '').Trim() }
+
+            if ($userAgents.Count -gt 0) {
+                Write-Host "`nUSER AGENTS TARGETED ($($userAgents.Count)):" -ForegroundColor Cyan
+                $userAgents | ForEach-Object {
+                    Write-Host "  - $_" -ForegroundColor White
+                }
+            }
+
+            if ($disallowed.Count -gt 0) {
+                Write-Host "`nDISALLOWED PATHS ($($disallowed.Count)):" -ForegroundColor Red
+                $disallowed | ForEach-Object {
+                    if ([string]::IsNullOrWhiteSpace($_)) {
+                        Write-Host "  - (Empty - allows all)" -ForegroundColor Green
+                    } else {
+                        Write-Host "  - $_" -ForegroundColor Yellow
+                    }
+                }
+
+                $sensitivePaths = $disallowed | Where-Object { 
+                    $_ -match '(admin|login|config|setup|debug|backup|sql|database|\.env|\.git|wp-|phpmyadmin|cpanel)' 
+                }
+                if ($sensitivePaths.Count -gt 0) {
+                    Write-Host "`nSENSITIVE PATHS FOUND:" -ForegroundColor Red
+                    $sensitivePaths | ForEach-Object {
+                        Write-Host "  [!] $_" -ForegroundColor Red
+                    }
+                }
+            } else {
+                Write-Host "`nDISALLOWED PATHS: None found" -ForegroundColor Green
+            }
+
+            if ($allowed.Count -gt 0) {
+                Write-Host "`nALLOWED PATHS ($($allowed.Count)):" -ForegroundColor Green
+                $allowed | ForEach-Object {
+                    Write-Host "  - $_" -ForegroundColor White
+                }
+            }
+            
+            if ($sitemaps.Count -gt 0) {
+                Write-Host "`nSITEMAP REFERENCES ($($sitemaps.Count)):" -ForegroundColor Magenta
+                $sitemaps | ForEach-Object {
+                    Write-Host "  - $_" -ForegroundColor White
+                }
+            }
+            
+            if ($crawlDelays.Count -gt 0) {
+                Write-Host "`nCRAWL DELAYS:" -ForegroundColor Yellow
+                $crawlDelays | ForEach-Object {
+                    Write-Host "  - $_ seconds" -ForegroundColor White
+                }
+            }
+
+            Write-Host "`nCOMPLETE RAW CONTENT:" -ForegroundColor DarkRed
+            Write-Host $content -ForegroundColor Gray
+            
+            $contentLength = $content.Length
+            Write-Host "`nFILE INFORMATION:" -ForegroundColor Yellow
+            Write-Host "  Content Length: $contentLength characters" -ForegroundColor White
+            Write-Host "  Approx. Size: $([math]::Round($contentLength / 1024, 2)) KB" -ForegroundColor White
+            Write-Host "  Lines: $($lines.Count)" -ForegroundColor White
+        } else {
+            Write-Host "  robots.txt found but appears to be empty or malformed." -ForegroundColor Yellow
+            Write-Host "  Raw content:" -ForegroundColor Cyan
+            Write-Host $content -ForegroundColor Gray
+        }
+        
+        Write-Log "Robots.txt comprehensive analysis completed: $($lines.Count) lines, $contentLength characters"
+        
     } catch {
-        Write-Host "`nRobots.txt not found or access error." -ForegroundColor Red
+        Write-Host "`n  robots.txt not found or inaccessible." -ForegroundColor Red
         Write-Log "Robots.txt not found: $($_.Exception.Message)" "WARNING"
     }
 }
@@ -611,11 +799,90 @@ function ScanSitemap {
         
         $sitemapUrl = "$url/sitemap.xml"
         $response = Invoke-WebRequestSafe -Uri $sitemapUrl
-        Write-Host "`n Sitemap found:" -ForegroundColor Green
-        Write-Host $response.Content.Substring(0, [Math]::Min($response.Content.Length, 500))
-        Write-Log "Sitemap.xml found and successfully read"
+        $lines = $content -split "`n" | Where-Object { $_.Trim() -ne '' }
+
+        $content = $response.Content.Trim()
+        
+        if ($content -match '<urlset') {
+            Write-Host "`n  STANDARD SITEMAP DETECTED (XML FORMAT)" -ForegroundColor Gray
+            $lines = $content -split "`n" | Where-Object { $_.Trim() -ne '' }
+            $urls = @()
+            
+            $locMatches = [regex]::Matches($content, '<loc>\s*([^<]+)\s*</loc>', [System.Text.RegularExpressions.RegexOptions]::IgnoreCase)
+            $urls += $locMatches | ForEach-Object { $_.Groups[1].Value.Trim() }
+            
+            $urlMatches = [regex]::Matches($content, '<url>\s*<loc>([^<]+)</loc>', [System.Text.RegularExpressions.RegexOptions]::IgnoreCase)
+            $urls += $urlMatches | ForEach-Object { $_.Groups[1].Value.Trim() }
+            
+            $urls = $urls | Where-Object { -not [string]::IsNullOrWhiteSpace($_) } | Select-Object -Unique
+            
+            Write-Host "`nTOTAL URLs EXTRACTED: $($urls.Count)" -ForegroundColor Green
+            
+            if ($urls.Count -gt 0) {
+                Write-Host "`nALL URLs FOUND:" -ForegroundColor Red
+                $urls | ForEach-Object {
+                    Write-Host "  - $_" -ForegroundColor White
+                }
+                
+                $categories = @{
+                    "Images" = $urls | Where-Object { $_ -match '\.(jpg|jpeg|png|gif|bmp|svg|webp)(\?|$)' }
+                    "PDFs" = $urls | Where-Object { $_ -match '\.pdf(\?|$)' }
+                    "Documents" = $urls | Where-Object { $_ -match '\.(doc|docx|xls|xlsx|ppt|pptx)(\?|$)' }
+                    "Admin" = $urls | Where-Object { $_ -match '(admin|login|dashboard|panel|wp-admin)' }
+                    "API" = $urls | Where-Object { $_ -match '(api|json|xml|rest)' }
+                }
+                
+                Write-Host "`nURL CATEGORIES:" -ForegroundColor Magenta
+                foreach ($category in $categories.Keys) {
+                    $count = $categories[$category].Count
+                    if ($count -gt 0) {
+                        Write-Host "  $category`: $count URLs" -ForegroundColor White
+                    }
+                }
+                
+                $interestingUrls = $urls | Where-Object { 
+                    $_ -match '(admin|login|config|setup|debug|backup|test|dev|staging)' 
+                }
+                if ($interestingUrls.Count -gt 0) {
+                    Write-Host "`nINTERESTING/ADMIN URLs:" -ForegroundColor Red
+                    $interestingUrls | ForEach-Object {
+                        Write-Host "  [!] $_" -ForegroundColor Red
+                    }
+                }
+            }
+            
+        } elseif ($content -match '^http' -or $content -match 'sitemap') {
+            Write-Host "`n  SITEMAP INDEX DETECTED" -ForegroundColor Gray
+            $lines = $content -split "`n" | Where-Object { $_.Trim() -ne '' }
+            $sitemapRefs = $content -split "`n" | Where-Object { 
+                $_ -match '^http' -or $_ -match 'sitemap' -or $_ -match '\.xml'
+            } | ForEach-Object { $_.Trim() } | Where-Object { -not [string]::IsNullOrWhiteSpace($_) }
+            
+            Write-Host "`nSITEMAP REFERENCES FOUND: $($sitemapRefs.Count)" -ForegroundColor Green
+            
+            if ($sitemapRefs.Count -gt 0) {
+                Write-Host "`nALL SITEMAP REFERENCES:" -ForegroundColor Yellow
+                $sitemapRefs | ForEach-Object {
+                    Write-Host "  - $_" -ForegroundColor White
+                }
+            }
+            
+        } else {
+            Write-Host "`nUNKNOWN SITEMAP FORMAT" -ForegroundColor Yellow
+        }
+        
+        Write-Host "`nCOMPLETE RAW CONTENT:" -ForegroundColor DarkRed
+        Write-Host $content -ForegroundColor Gray
+
+        $contentLength = $content.Length
+        Write-Host "`nFILE INFORMATION:" -ForegroundColor Yellow
+        Write-Host "  Content Length: $contentLength characters" -ForegroundColor White
+        Write-Host "  Approx. Size: $([math]::Round($contentLength / 1024, 2)) KB" -ForegroundColor White
+        Write-Host "  Lines: $($lines.Count)" -ForegroundColor White
+        Write-Log "Sitemap.xml comprehensive analysis completed: $contentLength characters"
+        
     } catch {
-        Write-Host "`nSitemap.xml not found or access error." -ForegroundColor Red
+        Write-Host "`n  sitemap.xml not found or inaccessible." -ForegroundColor Red
         Write-Log "Sitemap.xml not found: $($_.Exception.Message)" "WARNING"
     }
 }
@@ -728,147 +995,6 @@ function Get-ip-from-url {
     }
 }
 
-function Get-DNSRecords {
-    param([string]$url)
-
-    $domain = ($url -replace '^https?://', '') -replace '/.*$', ''
-
-    Write-Host "`n Checking DNS records..." -ForegroundColor Yellow
-    Write-Log "Starting DNS records check for: $domain" "INFO"
-
-    try {
-        Write-Log "Looking for MX records for: $domain" "INFO"
-        $mx = Resolve-DnsName -Name $domain -Type MX -ErrorAction Stop
-        if ($mx) { 
-            Write-host "`n Records found:" -ForegroundColor Green
-            Write-Host "   MX Records:" -ForegroundColor Yellow
-            $mx | ForEach-Object { 
-                Write-Host "   $($_.NameExchange) (Pref: $($_.Preference))"
-            }
-            Write-Log "MX records found for: $domain" "INFO"
-        }
-    }
-    catch {
-        Write-Host "     No MX records found" -ForegroundColor Red
-        Write-Log "No MX records found for: $domain" "WARNING"
-    }
-
-    try {
-        Write-Log "Looking for NS records for: $domain" "INFO"
-        $ns = Resolve-DnsName -Name $domain -Type NS -ErrorAction Stop
-        if ($ns) {
-            Write-Host "`n   NS Records:" -ForegroundColor Magenta
-            $ns | ForEach-Object { 
-                Write-Host "   $($_.NameHost)"
-            }
-            Write-Log "NS records found for: $domain" "INFO"
-        }
-    }
-    catch {
-        Write-Host "     No NS records found" -ForegroundColor Red
-        Write-Log "No NS records found for: $domain" "WARNING"
-    }
-
-    try {
-        Write-Log "Looking for SOA records for: $domain" "INFO"
-        $soa = Resolve-DnsName -Name $domain -Type SOA -ErrorAction Stop
-        if ($soa) {
-            Write-Host "`n   SOA Record:" -ForegroundColor DarkYellow
-            $soa | ForEach-Object { 
-                Write-Host "     Primary Server: $($_.PrimaryServer)"
-                Write-Host "     Admin: $($_.NameAdministrator)"
-                Write-Host "     Serial: $($_.SerialNumber)"
-            }
-            Write-Log "SOA record found for: $domain" "INFO"
-        }
-    }
-    catch {
-        Write-Host "     No SOA record found" -ForegroundColor Red
-        Write-Log "No SOA record found for: $domain" "WARNING"
-    }
-
-    try {
-        Write-Log "Looking for CNAME records for: $domain" "INFO"
-        $cname = Resolve-DnsName -Name $domain -Type CNAME -ErrorAction Stop
-        if ($cname) {
-            Write-Host "`n   CNAME Record:" -ForegroundColor DarkGreen
-            $cname | ForEach-Object { 
-                if ($_.NameAlias -and $_.NameHost) {
-                    Write-Host "     $($_.NameAlias) -> $($_.NameHost)"
-                }
-            }
-        }
-    }
-    catch {
-        Write-Host "     No CNAME records found" -ForegroundColor Red
-        Write-Log "No CNAME records found for: $domain" "WARNING"
-    }
-
-    try {
-        Write-Log "Looking for TXT records for: $domain" "INFO"
-        $txt = Resolve-DnsName -Name $domain -Type TXT -ErrorAction Stop
-        if ($txt) {
-            Write-Host "`n   TXT Records:" -ForegroundColor DarkCyan
-            $txt | ForEach-Object { 
-                Write-Host "     $($_.Strings -join '; ')"
-            }
-            Write-Log "TXT records found for: $domain" "INFO"
-        }
-    }
-    catch {
-        Write-Host "     No TXT records found" -ForegroundColor Red
-        Write-Log "No TXT records found for: $domain" "WARNING"
-    }
-
-    Write-Log "Starting reverse lookup (PTR) for: $domain" "INFO"
-    $ips = @()
-
-    try {
-        $a = Resolve-DnsName -Name $domain -Type A -ErrorAction SilentlyContinue
-        if ($a) { 
-            $ips += $a.IPAddress
-            Write-Log "A records found for: $domain" "INFO"
-        }
-    }
-    catch {
-        Write-Log "Failed to get A records for: $domain" "WARNING"
-    }
-
-    try {
-        $aaaa = Resolve-DnsName -Name $domain -Type AAAA -ErrorAction SilentlyContinue
-        if ($aaaa) { 
-            $ips += $aaaa.IPAddress
-            Write-Log "AAAA records found for: $domain" "INFO"
-        }
-    }
-    catch {
-        Write-Log "Failed to get AAAA records for: $domain" "WARNING"
-    }
-
-    if ($ips.Count -gt 0) {
-        Write-Host "`n   Reverse Lookup (PTR):" -ForegroundColor Cyan
-        Write-Log "Starting PTR lookups for $($ips.Count) IP addresses" "INFO"
-        
-        foreach ($ip in $ips) {
-            try {
-                $hostEntry = [System.Net.Dns]::GetHostEntry($ip)
-                Write-Host "     $ip -> $($hostEntry.HostName)"
-                Write-Log "PTR found for $ip : $($hostEntry.HostName)" "INFO"
-            }
-            catch {
-                Write-Host "     $ip -> PTR not found" -ForegroundColor DarkYellow
-                Write-Log "PTR not found for: $ip" "WARNING"
-            }
-        }
-    }
-    else {
-        Write-Host "`n   No IP addresses found for reverse lookup." -ForegroundColor DarkYellow
-        Write-Log "No A or AAAA records found for reverse lookup: $domain" "INFO"
-    }
-
-    Write-Log "DNS records check completed for: $domain" "INFO"
-}
-
 function Test-DNSZoneTransfer {
     param([string]$url)
     
@@ -893,7 +1019,7 @@ function Test-DNSZoneTransfer {
             try {
                 $zone = Resolve-DnsName -Name $domain -Type Any -Server $ns.NameServer -ErrorAction Stop
                 if ($zone) {
-                    Write-Host "`n   ZONE TRANSFER VULNERABLE!" -ForegroundColor Red
+                    Write-Host "`n   [!]ZONE TRANSFER VULNERABLE[!]" -ForegroundColor Red
                     Write-Host "   All DNS records exposed:" -ForegroundColor Yellow
                     
                     $zone | Select-Object -First 10 | Format-Table Name, Type, IPAddress -AutoSize
@@ -902,7 +1028,7 @@ function Test-DNSZoneTransfer {
                     $zoneTransferVulnerable = $true
                 }
             } catch {
-                Write-Host "   Zone transfer blocked" -ForegroundColor DarkGreen
+                Write-Host "     Zone transfer blocked (safe config!)" -ForegroundColor DarkGreen
             }
         }
         
@@ -914,6 +1040,168 @@ function Test-DNSZoneTransfer {
         Write-Host "  Failed to get NS records: $($_.Exception.Message)" -ForegroundColor Red
     }
 }
+
+function Get-DNSRecords {
+    param([string]$url)
+
+    $domain = ($url -replace '^https?://', '') -replace '/.*$', ''
+
+    Write-Host "`n Checking DNS records for: $domain" -ForegroundColor Yellow
+    Write-Log "Starting DNS records check for: $domain" "INFO"
+
+    $DNSResults = @{
+        Domain = $domain
+        Timestamp = Get-Date
+        Records = @{}
+    }
+
+    $recordTypes = @(
+        @{Type = "A"; Name = "A Records (IPv4)"; Color = "Green"},
+        @{Type = "AAAA"; Name = "AAAA Records (IPv6)"; Color = "Blue"},
+        @{Type = "MX"; Name = "MX Records"; Color = "Yellow"},
+        @{Type = "NS"; Name = "NS Records"; Color = "Magenta"},
+        @{Type = "SOA"; Name = "SOA Record"; Color = "DarkYellow"},
+        @{Type = "CNAME"; Name = "CNAME Record"; Color = "DarkGreen"},
+        @{Type = "TXT"; Name = "TXT Records"; Color = "DarkCyan"}
+    )
+
+    $recordsFound = $false
+    $ips = @()
+    $ipv4Addresses = @()
+    $ipv6Addresses = @()
+
+    foreach ($record in $recordTypes) {
+        try {
+            Write-Log "Looking for $($record.Type) records for: $domain" "INFO"
+            $result = Resolve-DnsName -Name $domain -Type $record.Type -ErrorAction Stop
+            
+            if ($result) {
+                if (-not $recordsFound) {
+                    Write-host "`n Records found:" -ForegroundColor Green
+                    $recordsFound = $true
+                }
+                
+                Write-Host "`n   $($record.Name):" -ForegroundColor $record.Color
+                $DNSResults.Records[$record.Type] = $result
+                
+                switch ($record.Type) {
+                    "A" {
+                        $result | ForEach-Object { 
+                            Write-Host "     $($_.IPAddress)"
+                            $ips += $_.IPAddress
+                            $ipv4Addresses += $_.IPAddress
+                        }
+                    }
+                    "AAAA" {
+                        $result | ForEach-Object { 
+                            Write-Host "     $($_.IPAddress)"
+                            $ips += $_.IPAddress
+                            $ipv6Addresses += $_.IPAddress
+                        }
+                    }
+                    "MX" {
+                        $result | ForEach-Object { 
+                            Write-Host "     $($_.NameExchange) (Pref: $($_.Preference))"
+                        }
+                    }
+                    "NS" {
+                        $result | ForEach-Object { 
+                            Write-Host "     $($_.NameHost)"
+                        }
+                    }
+                    "SOA" {
+                        $result | ForEach-Object { 
+                            Write-Host "     Primary Server: $($_.PrimaryServer)"
+                            Write-Host "     Admin: $($_.NameAdministrator)"
+                            Write-Host "     Serial: $($_.SerialNumber)"
+                            Write-Host "     Refresh: $($_.RefreshInterval)"
+                            Write-Host "     Retry: $($_.RetryInterval)"
+                            Write-Host "     Expire: $($_.ExpireLimit)"
+                            Write-Host "     Minimum TTL: $($_.MinimumTimeToLive)"
+                        }
+                    }
+                    "CNAME" {
+                        $result | ForEach-Object { 
+                            if ($_.NameAlias -and $_.NameHost) {
+                                Write-Host "     $($_.NameAlias) -> $($_.NameHost)"
+                            }
+                        }
+                    }
+                    "TXT" {
+                        $result | ForEach-Object { 
+                            $txtString = $_.Strings -join '; '
+                            Write-Host "     $txtString"
+                        }
+                    }
+                }
+                
+                Write-Log "$($record.Type) records found for: $domain" "INFO"
+            }
+        }
+        catch {
+            Write-Host "     No $($record.Type) records found" -ForegroundColor Red
+            Write-Log "No $($record.Type) records found for: $domain" "WARNING"
+        }
+    }
+
+    if ($ips.Count -gt 0) {
+        Write-Host "`n   Reverse Lookup (PTR):" -ForegroundColor Cyan
+        Write-Log "Starting PTR lookups for $($ips.Count) IP addresses ($($ipv4Addresses.Count) IPv4, $($ipv6Addresses.Count) IPv6)" "INFO"
+        
+        $ptrResults = @()
+        $ptrIPv4Results = @()
+        $ptrIPv6Results = @()
+        
+        # Processa IPv4
+        foreach ($ip in $ipv4Addresses) {
+            try {
+                $hostEntry = [System.Net.Dns]::GetHostEntry($ip)
+                Write-Host "     IPv4: $ip -> $($hostEntry.HostName)" -ForegroundColor Green
+                $ptrResults += @{IP=$ip; Hostname=$hostEntry.HostName; Type="IPv4"}
+                $ptrIPv4Results += @{IP=$ip; Hostname=$hostEntry.HostName}
+                Write-Log "PTR found for IPv4 $ip : $($hostEntry.HostName)" "INFO"
+            }
+            catch {
+                Write-Host "     IPv4: $ip -> PTR not found" -ForegroundColor Red
+                Write-Log "PTR not found for IPv4: $ip" "WARNING"
+                $ptrResults += @{IP=$ip; Hostname="Not Found"; Type="IPv4"}
+                $ptrIPv4Results += @{IP=$ip; Hostname="Not Found"}
+            }
+        }
+        
+        foreach ($ip in $ipv6Addresses) {
+            try {
+                $hostEntry = [System.Net.Dns]::GetHostEntry($ip)
+                Write-Host "     IPv6: $ip -> $($hostEntry.HostName)`n" -ForegroundColor Green
+                $ptrResults += @{IP=$ip; Hostname=$hostEntry.HostName; Type="IPv6"}
+                $ptrIPv6Results += @{IP=$ip; Hostname=$hostEntry.HostName}
+                Write-Log "PTR found for IPv6 $ip : $($hostEntry.HostName)" "INFO"
+            }
+            catch {
+                Write-Host "     IPv6: $ip -> PTR not found" -ForegroundColor Red
+                Write-Log "PTR not found for IPv6: $ip" "WARNING"
+                $ptrResults += @{IP=$ip; Hostname="Not Found"; Type="IPv6"}
+                $ptrIPv6Results += @{IP=$ip; Hostname="Not Found"}
+            }
+        }
+        
+        $DNSResults.Records.PTR = $ptrResults
+        $DNSResults.Records.PTR_IPv4 = $ptrIPv4Results
+        $DNSResults.Records.PTR_IPv6 = $ptrIPv6Results
+    }
+    else {
+        Write-Host "`n   No IP addresses found for reverse lookup." -ForegroundColor Red
+        Write-Log "No A or AAAA records found for reverse lookup: $domain" "INFO"
+    }
+
+    if (-not $recordsFound) {
+        Write-Host "`n   No DNS records found for: $domain" -ForegroundColor Red
+    }
+
+    Write-Log "DNS records check completed for: $domain" "INFO"
+    
+}
+
 # =============================================
 # FUNÇÕES DE SCAN DE PORTAS/SERVIÇOS
 # =============================================
@@ -1101,7 +1389,6 @@ function Get-PortBanner {
     }
     
     Write-Progress -Activity "Port Banner Grabbing" -Status "Completed!" -Completed
-    Write-Host "`n Port scanning completed!`n" -ForegroundColor Green
 }
 
 # =============================================
@@ -1667,8 +1954,8 @@ function PowerDiNSpec {
             "Get IP Address from DNS",
             "Discover Allowed HTTP Methods",
             "Capture Server Headers",
-            "Security Headers Analysis",
             "Detect Technologies in Use",
+            "Security Headers Analysis",
             "DNS Zone Transfer Test",
             "Check DNS Records",
             "List Links Found in HTML", 
