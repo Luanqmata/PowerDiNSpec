@@ -928,6 +928,7 @@ function ScanHTML {
 
                 if ([string]::IsNullOrEmpty($filePath)) {
                     $filePath = "fuzz_words_formated.txt"
+                    return $palavras
                 }
                 
                 $fullPath = Join-Path $fuzzingDir $filePath
@@ -936,12 +937,13 @@ function ScanHTML {
                 Write-Host "`nWords saved to: $fullPath" -ForegroundColor Green
                 Write-Host "Full path: $((Get-Item $fullPath).FullName)" -ForegroundColor Gray
                 Write-Log "Words saved to: $fullPath"
+                return $palavras
             }
         } else {
             Write-Host "`nNo relevant words were found in the HTML." -ForegroundColor Red
         }
 
-        return $palavras
+        # return $palavras
 
     } catch {
         Handle-WebError -ErrorObject $_
