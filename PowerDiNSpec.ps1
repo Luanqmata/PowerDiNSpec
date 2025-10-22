@@ -30,7 +30,7 @@ function Logo_Menu {
                                     |_  ..  _|   | |_) |/ _//\\ \ /\ / // _ \| '__|  | | | || || | | |/ __|   | |_) |/  _ \ / __|     / /
                                     |_      _|   | .__/| (//) |\ V  V /|  __/| |     | |_/ || || | | |\__ \   | .__/|  ___/| (__     |_|
                                       |_||_|     |_|    \//__/  \_/\_/  \___||_|     |____/ |_||_| |_||___/   |_|    \____| \___|
-                                                        //               | |                (_)        |_|                           (_)           2.2.0v
+                                                        //               | |                (_)        |_|                           (_)           2.2.5v
 
                                          
 "@ -split "`n"
@@ -44,6 +44,7 @@ function Logo_Menu {
 # VARIÁVEIS GLOBAIS E CONFIGURAÇÕES
 # =============================================
 $global:PortsForBannerScan = @(21,22,80,443,3306,5432,8080)
+$global:AutoFuzzingMode = 0
 
 $global:AllScans = @(
     @{ Name = "HTTP Status Code";       Enabled = 1; Function = { param($url) ScanStatusCode -url $url } },
@@ -887,69 +888,6 @@ function ScanSitemap {
     }
 }
 
-function ScanHTML {
-    param ([string]$url)
-    try {
-        Write-Host "`n Obtaining words from the HTML source code..." -ForegroundColor Yellow
-        Write-Log "Starting ScanHTML for: $url"
-        Start-Sleep -Seconds 2
-
-        $response = Invoke-WebRequestSafe -Uri $url
-        $htmlContent = $response.Content
-
-        # Extract words with improved regex
-        $palavras = ($htmlContent -split '[^\p{L}0-9_\-]+') |
-                    Where-Object { $_.Length -gt 2 -and -not $_.StartsWith('#') -and -not $_.StartsWith('//') } |
-                    Select-Object -Unique |
-                    Sort-Object
-
-        $commonWords = @('n0n9')
-        $palavras = $palavras | Where-Object { $commonWords -notcontains $_.ToLower() }
-
-        Write-Host "`nTotal unique words found: $($palavras.Count)" -ForegroundColor Gray
-        Write-Log "Found $($palavras.Count) unique words for fuzzing"
-
-        if ($palavras.Count -gt 0) {
-            Write-Host "`nExample of found words (first 10):" -ForegroundColor Yellow
-            $palavras | Select-Object -First 10 | ForEach-Object {
-                Write-Host "   $_" -ForegroundColor White
-            }
-
-            $save = Read-Host "`nDo you want to save the words to a file for fuzzing? (Y/N)"
-
-            if ($save -eq 'Y' -or $save -eq 'y') {
-                $fuzzingDir = "Fuzz_files"
-                if (-not (Test-Path $fuzzingDir)) {
-                    New-Item -ItemType Directory -Path $fuzzingDir -Force | Out-Null
-                    Write-Host "`nCreated directory: $fuzzingDir" -ForegroundColor Green
-                }
-
-                $filePath = Read-Host "`nEnter the file name (default: words_fuzzing.txt)"
-
-                if ([string]::IsNullOrEmpty($filePath)) {
-                    $filePath = "fuzz_words_formated.txt"
-                    return $palavras
-                }
-                
-                $fullPath = Join-Path $fuzzingDir $filePath
-                $palavras | Out-File -FilePath $fullPath -Encoding UTF8
-                
-                Write-Host "`nWords saved to: $fullPath" -ForegroundColor Green
-                Write-Host "Full path: $((Get-Item $fullPath).FullName)" -ForegroundColor Gray
-                Write-Log "Words saved to: $fullPath"
-                return $palavras
-            }
-        } else {
-            Write-Host "`nNo relevant words were found in the HTML." -ForegroundColor Red
-        }
-
-        # return $palavras
-
-    } catch {
-        Handle-WebError -ErrorObject $_
-        return @()
-    }
-}
 # =============================================
 # FUNÇÕES DE SCAN DNS/REDE
 # =============================================
@@ -1724,10 +1662,308 @@ function Configure-ScansInteractive {
         }
     }
 }
+# =============================================
+# Fuzzing Functions
+# =============================================
 
+function ScanHTML {
+    param ([string]$url)
+    try {
+        Write-Host "`n Obtaining words from the HTML source code..." -ForegroundColor Yellow
+        Write-Log "Starting ScanHTML for: $url"
+        Start-Sleep -Seconds 2
+
+        $response = Invoke-WebRequestSafe -Uri $url
+        $htmlContent = $response.Content
+
+        $cleanContent = $htmlContent -replace '[^\x00-\x7F]', ' '
+        $cleanContent = $cleanContent -replace '&[a-z]+;', ' '
+        
+        $palavras = ($cleanContent -split '[^\p{L}0-9_\-]+') |
+                    Where-Object { 
+                        $_.Length -gt 2 -and 
+                        -not $_.StartsWith('#') -and 
+                        -not $_.StartsWith('//') -and
+                        -not $_.StartsWith('http') -and
+                        -not $_.Contains('://') -and
+                        -not ($_ -match '^\d+$')
+                    } |
+                    Select-Object -Unique |
+                    Sort-Object
+
+        $commonWords = @(
+            'n0n9', 'div', 'span', 'html', 'head', 'body', 'script', 'style', 'css', 
+            'class', 'id', 'src', 'href', 'alt', 'title', 'meta', 'link', 'img', 
+            'input', 'button', 'form', 'table', 'tr', 'td', 'th', 'ul', 'ol', 'li',
+            'p', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'br', 'hr', 'nav', 'header',
+            'footer', 'section', 'article', 'aside', 'main', 'DOCTYPE', 'utf-8',
+            'viewport', 'initial-scale', 'maximum-scale', 'device-width', 'charset',
+            'stylesheet', 'javascript', 'jquery', 'modernizr', 'waypoints', 'smoothscroll',
+            'backstretch', 'preloader', 'no-js', 'ie7', 'ie8', 'googleapis', 'png',
+            'gif', 'favicon', 'php', 'json', 'xml'
+        )
+        
+        $palavras = $palavras | Where-Object { 
+            $commonWords -notcontains $_.ToLower() -and
+            -not $_.StartsWith('fa-') -and  # Remove Font Awesome classes
+            -not $_.StartsWith('js-') -and   # Remove classes JS
+            -not $_.EndsWith('.js') -and     # Remove arquivos JS
+            -not $_.EndsWith('.css')         # Remove arquivos CSS
+        }
+
+        Write-Host "`nTotal unique words found: $($palavras.Count)" -ForegroundColor Gray
+        Write-Log "Found $($palavras.Count) unique words for fuzzing"
+
+        if ($palavras.Count -gt 0) {
+            Write-Host "`nExample of found words (first 10):" -ForegroundColor Yellow
+            $palavras | Select-Object -First 10 | ForEach-Object {
+                Write-Host "   $_" -ForegroundColor White
+            }
+
+            $save = Read-Host "`nDo you want to save the words to a file for fuzzing? (Y/N)"
+
+            $savedFilePath = $null
+            $autoSaveForFuzzing = $false
+
+            if ($save -eq 'Y' -or $save -eq 'y') {
+                $fuzzingDir = "Fuzz_files"
+                if (-not (Test-Path $fuzzingDir)) {
+                    New-Item -ItemType Directory -Path $fuzzingDir -Force | Out-Null
+                    Write-Host "`nCreated directory: $fuzzingDir" -ForegroundColor Green
+                }
+
+                $filePath = Read-Host "`nEnter the file name (default: words_fuzzing.txt)"
+
+                if ([string]::IsNullOrEmpty($filePath)) {
+                    $filePath = "words_fuzzing.txt"
+                }
+                
+                $fullPath = Join-Path $fuzzingDir $filePath
+                $palavras | Out-File -FilePath $fullPath -Encoding UTF8
+                
+                Write-Host "`nWords saved to: $fullPath" -ForegroundColor Green
+                Write-Host "Full path: $((Get-Item $fullPath).FullName)" -ForegroundColor Gray
+                Write-Log "Words saved to: $fullPath"
+                
+                $savedFilePath = $fullPath
+                
+            }
+            elseif (($save -eq 'N' -or $save -eq 'n') -and $global:AutoFuzzingMode -eq 1) {
+                Write-Host "`nAuto Fuzzing is ENABLED. Saving wordlist automatically for immediate use..." -ForegroundColor Yellow
+                $fuzzingDir = "Fuzz_files"
+                if (-not (Test-Path $fuzzingDir)) {
+                    New-Item -ItemType Directory -Path $fuzzingDir -Force | Out-Null
+                }
+                $autoFilePath = Join-Path $fuzzingDir "temp_autofuzz_$(Get-Date -Format 'HHmmss').txt"
+                $palavras | Out-File -FilePath $autoFilePath -Encoding UTF8
+                Write-Host "Wordlist saved automatically for Auto Fuzzing to: $autoFilePath" -ForegroundColor Gray
+                Write-Log "Wordlist auto-saved for Auto Fuzzing: $autoFilePath" "INFO"
+                $savedFilePath = $autoFilePath
+            }
+            
+            return @{
+                Words = $palavras
+                SavedFilePath = $savedFilePath
+                TotalWords = $palavras.Count
+            }
+            
+        } else {
+            Write-Host "`nNo relevant words were found in the HTML." -ForegroundColor Red
+            return @{
+                Words = @()
+                SavedFilePath = $null
+                TotalWords = 0
+            }
+        }
+
+    } catch {
+        Handle-WebError -ErrorObject $_
+        return @{
+            Words = @()
+            SavedFilePath = $null
+            TotalWords = 0
+        }
+    }
+}
+
+function Start-FuzzingRecursive {
+    param(
+        [string]$url,
+        [string]$wordlist
+    )
+    
+    try {
+        Write-Host "`n[RECURSIVE FUZZING] Starting Recursive Fuzzing..." -ForegroundColor Yellow
+        
+        if (-not (Test-Path $wordlist)) {
+            Write-Host "[FUZZING] X Wordlist file not found: $wordlist" -ForegroundColor Red
+            return
+        }
+    
+        $wordsToUse = [System.IO.File]::ReadAllLines($wordlist)
+        $totalWords = $wordsToUse.Count
+        
+        if ($totalWords -eq 0) {
+            Write-Host "[FUZZING] X No words available for fuzzing." -ForegroundColor Red
+            return
+        }
+
+        Write-Host "[FUZZING] Target: $url" -ForegroundColor White
+        Write-Host "[FUZZING] Total words: $totalWords" -ForegroundColor White
+        Write-Host "[FUZZING] Mode: Recursive Mode" -ForegroundColor Magenta
+        Write-Host "[FUZZING] Delay: 50ms (Optimized)" -ForegroundColor White
+        Write-Host "[FUZZING] Starting...`n" -ForegroundColor Green
+        
+        $allResults = New-Object System.Collections.ArrayList
+        $totalRequests = 0
+        $currentDepth = 0
+        
+        function Invoke-RecursiveFuzzing {
+            param(
+                [string]$baseUrl,
+                [string[]]$wordlist,
+                [int]$depth = 1
+            )
+            
+            $localResults = @()
+            $localCounter = 0
+            $script:currentDepth = $depth
+            
+            foreach ($word in $wordlist) {
+                $localCounter++
+                $testUrl = "$baseUrl/$word"
+                
+                $percentComplete = [math]::Round(($localCounter / $wordlist.Count) * 100, 1)
+                $currentDir = $baseUrl.Replace($url, "").Trim('/')
+                if ([string]::IsNullOrEmpty($currentDir)) {
+                    $currentDir = "ROOT"
+                }
+                
+                Write-Progress -Activity "Infinite Recursive Fuzzing" `
+                             -Status "Directory: /$currentDir | Level: $depth | Word: $localCounter/$($wordlist.Count) ($percentComplete%)" `
+                             -PercentComplete $percentComplete `
+                             -CurrentOperation "Testing: $word"
+                
+                try {
+                    $request = [System.Net.WebRequest]::Create($testUrl)
+                    $request.Method = "HEAD"
+                    $request.Timeout = 3000  # 3 seconds instead of 5
+                    $request.UserAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+                    
+                    $response = $request.GetResponse()
+                    $statusCode = [int]$response.StatusCode
+                    $contentLength = $response.Headers["Content-Length"]
+                    $response.Close()
+                    
+                    if ($statusCode -ne 404) {
+                        $result = [PSCustomObject]@{
+                            URL = $testUrl
+                            StatusCode = $statusCode
+                            ContentLength = $contentLength
+                            Word = $word
+                            Depth = $depth
+                        }
+                        
+                        $localResults += $result
+                        
+                        if ($statusCode -eq 200) {
+                            Write-Host "  [200] Level $depth - $testUrl" -ForegroundColor Green
+                        } elseif ($statusCode -eq 301 -or $statusCode -eq 302) {
+                            Write-Host "  [$statusCode] Level $depth - $testUrl" -ForegroundColor Yellow
+                        } elseif ($statusCode -eq 403 -or $statusCode -eq 401) {
+                            Write-Host "  [$statusCode] Level $depth - $testUrl" -ForegroundColor Red
+                        } else {
+                            Write-Host "  [$statusCode] Level $depth - $testUrl" -ForegroundColor White
+                        }
+
+                        if ($statusCode -eq 200) {
+                            Write-Host "    -> Directory found! Continuing recursion at level $(($depth + 1))..." -ForegroundColor Cyan
+                            $recursiveResults = Invoke-RecursiveFuzzing -baseUrl $testUrl -wordlist $wordlist -depth ($depth + 1)
+                            if ($recursiveResults) {
+                                $localResults += $recursiveResults
+                            }
+                        }
+                    }
+                    
+                } catch [System.Net.WebException] {
+                    # Silently ignore 404 errors
+                } catch {
+                    # Other errors are ignored for performance
+                }
+                
+                Start-Sleep -Milliseconds 50
+                
+                $script:totalRequests++
+            }
+            
+            # Clear progress bar when this level completes
+            if ($depth -eq 1) {
+                Write-Progress -Activity "Infinite Recursive Fuzzing" -Completed
+            }
+            
+            return $localResults
+        }
+        
+        Write-Host "[FUZZING] Starting infinite recursive fuzzing (Optimized)..." -ForegroundColor Magenta
+        $results = Invoke-RecursiveFuzzing -baseUrl $url -wordlist $wordsToUse -depth 1
+        
+        if ($results -and $results.Count -gt 0) {
+            foreach ($result in $results) {
+                [void]$allResults.Add($result)
+            }
+        }
+        
+        Write-Progress -Activity "Fuzzing" -Completed
+        
+        Write-Host "`n[FUZZING] OK Scan completed!" -ForegroundColor Green
+        Write-Host "[FUZZING] Total words in wordlist: $totalWords" -ForegroundColor White
+        Write-Host "[FUZZING] Total requests made: $totalRequests" -ForegroundColor White
+        Write-Host "[FUZZING] Interesting results found: $($allResults.Count)" -ForegroundColor Cyan
+        
+        if ($allResults.Count -gt 0) {
+            $maxDepth = ($allResults | Measure-Object -Property Depth -Maximum).Maximum
+            $avgDepth = ($allResults | Measure-Object -Property Depth -Average).Average
+            Write-Host "[FUZZING] Maximum depth reached: $maxDepth" -ForegroundColor Magenta
+            Write-Host "[FUZZING] Average depth: $([math]::Round($avgDepth, 1))" -ForegroundColor Magenta
+        }
+        
+        if ($allResults.Count -gt 0) {
+            Write-Host "`n[FUZZING] RESULTS FOUND:" -ForegroundColor Yellow
+            
+            if ($allResults.Count -gt 50) {
+                Write-Host "  (Showing first 50 of $($allResults.Count) results)" -ForegroundColor Gray
+                $allResults | Sort-Object Depth, URL | Select-Object -First 50 | Format-Table URL, StatusCode, Depth, ContentLength -AutoSize
+            } else {
+                $allResults | Sort-Object Depth, URL | Format-Table URL, StatusCode, Depth, ContentLength -AutoSize
+            }
+            
+            Write-Host "`n[FUZZING] Do you want to save the results to a file?" -ForegroundColor Yellow
+            $saveResults = Read-Host "   (Y) Yes / (N) No [Default: N]"
+            
+            if ($saveResults -eq 'Y' -or $saveResults -eq 'y') {
+                $fuzzingDir = "Fuzz_files"
+                if (-not (Test-Path $fuzzingDir)) {
+                    New-Item -ItemType Directory -Path $fuzzingDir -Force | Out-Null
+                }
+                
+                $timestamp = Get-Date -Format "yyyyMMdd_HHmmss"
+                $outputFile = Join-Path $fuzzingDir "fuzzing_recursive_results_$timestamp.csv"
+                $allResults | Export-Csv -Path $outputFile -NoTypeInformation -Encoding UTF8
+                
+                Write-Host "`n[FUZZING] OK Results saved to: $outputFile" -ForegroundColor Green
+            }
+        } else {
+            Write-Host "[FUZZING] No interesting results found." -ForegroundColor Gray
+        }
+        
+    } catch {
+        Write-Host "[FUZZING] X Error during fuzzing: $($_.Exception.Message)" -ForegroundColor Red
+    }
+}
 # =============================================
 # FUNÇÕES DE EXECUÇÃO E MENU
 # =============================================
+
 function RunAllScans {
     param ([string]$url)
     
@@ -1791,24 +2027,101 @@ function RunAllScans {
             Write-Host $statusText -ForegroundColor Red
         }
     }
-    Start-Sleep -Seconds 1.5
-    Write-Host "`n`n               tip: You can configure the scans in the configuration Sub-Menu - Option [0] ." -ForegroundColor Yellow      
+    
+    Write-Host "`n`n               Auto Fuzzing Mode: $(if ($global:AutoFuzzingMode -eq 1) { 'ENABLED' } else { 'DISABLED' })" -ForegroundColor $(if ($global:AutoFuzzingMode -eq 1) { "Green" } else { "Red" })
+    
+    Write-Host "`n               tip: You can configure the scans in the configuration Sub-Menu - Option [0] ." -ForegroundColor Yellow      
     Write-Host ""
     
-    #Sleep de 2 segundos
     Start-Sleep -Seconds 3
 
     $counter = 0
+    $fuzzingResult = $null
+    $scanHTMLExecuted = $false
+    
     foreach ($scan in $scansToRun) {
         $counter++
         Write-Host "`n`n=== $counter. $($scan.Name) ===" -ForegroundColor Gray
-        try {
-            # Execute the scan function, passing the URL as parameter
-            & $scan.Function $url
-        } catch {
-            Write-Host "Error while executing scan: $($_.Exception.Message)" -ForegroundColor Red
+        
+        if ($scan.Name -eq "Words for Fuzzing") {
+            try {
+                Write-Host "Executing Words for Fuzzing (this will be used for Auto Fuzzing if enabled)..." -ForegroundColor Cyan
+                $fuzzingResult = & $scan.Function $url
+                $scanHTMLExecuted = $true
+                
+                if ($fuzzingResult -and $fuzzingResult.SavedFilePath) {
+                    Write-Host "Wordlist available at: $($fuzzingResult.SavedFilePath)" -ForegroundColor Green
+                    Write-Host "Total words extracted: $($fuzzingResult.TotalWords)" -ForegroundColor White
+                    Write-Log "Words for Fuzzing completed. Total words: $($fuzzingResult.TotalWords), File: $($fuzzingResult.SavedFilePath)" "INFO"
+                } else {
+                    Write-Host "Wordlist NOT saved but Auto Fuzzing will use temporary file if needed" -ForegroundColor Yellow
+                    Write-Host "Total words extracted: $($fuzzingResult.TotalWords)" -ForegroundColor White
+                }
+                
+            } catch {
+                Write-Host "Error while executing Words for Fuzzing: $($_.Exception.Message)" -ForegroundColor Red
+                Write-Log "Error in Words for Fuzzing: $($_.Exception.Message)" "ERROR"
+            }
+        } else {
+            # Execução normal para outros scans
+            try {
+                & $scan.Function $url
+            } catch {
+                Write-Host "Error while executing scan: $($_.Exception.Message)" -ForegroundColor Red
+                Write-Log "Error in $($scan.Name): $($_.Exception.Message)" "ERROR"
+            }
         }
+            
         Start-Sleep -Milliseconds 300
+    }
+    
+    Write-Host "`n`n=== CHECKING AUTO FUZZING MODE ===" -ForegroundColor Cyan
+    
+    if ($global:AutoFuzzingMode -eq 1) {
+        Write-Host "Auto Fuzzing Mode: ENABLED" -ForegroundColor Green
+        
+        if ($scanHTMLExecuted -and $fuzzingResult -and $fuzzingResult.TotalWords -gt 0) {
+            Write-Host "Words for Fuzzing: EXECUTED" -ForegroundColor Green
+            Write-Host "Total words: $($fuzzingResult.TotalWords)" -ForegroundColor White
+
+            if ($fuzzingResult.SavedFilePath -and (Test-Path $fuzzingResult.SavedFilePath)) {
+                Write-Host "Wordlist file: FOUND ($($fuzzingResult.SavedFilePath))" -ForegroundColor Green
+                $wordlistPath = $fuzzingResult.SavedFilePath
+            } else {
+                Write-Host "Wordlist file: NOT SAVED, creating temporary file..." -ForegroundColor Yellow
+                
+                $tempDir = "Fuzz_files"
+                if (-not (Test-Path $tempDir)) {
+                    New-Item -ItemType Directory -Path $tempDir -Force | Out-Null
+                }
+                
+                $tempWordlist = Join-Path $tempDir "temp_autofuzz_$(Get-Date -Format 'HHmmss').txt"
+                $fuzzingResult.Words | Out-File -FilePath $tempWordlist -Encoding UTF8
+                $wordlistPath = $tempWordlist
+                
+                Write-Host "Temporary wordlist created: $tempWordlist" -ForegroundColor Green
+            }
+
+            Write-Host "`n      === STARTING AUTO FUZZING ===" -ForegroundColor Magenta
+            Write-Host "Launching recursive fuzzing with generated wordlist..." -ForegroundColor Cyan
+            
+            Start-Sleep -Seconds 2
+            
+            # Executa o fuzzing recursivo
+            Start-FuzzingRecursive -url $url -wordlist $wordlistPath
+            
+            if ($wordlistPath -like "*temp_autofuzz_*" -and (Test-Path $wordlistPath)) {
+                Remove-Item $wordlistPath -Force
+                Write-Host "Temporary wordlist cleaned up: $wordlistPath" -ForegroundColor Gray
+            }
+            
+        } else {
+            Write-Host "Words for Fuzzing: NOT EXECUTED OR FAILED" -ForegroundColor Red
+            Write-Host "Auto Fuzzing skipped - make sure 'Words for Fuzzing' scan is enabled and words were extracted." -ForegroundColor Yellow
+        }
+    } else {
+        Write-Host "Auto Fuzzing Mode: DISABLED" -ForegroundColor Yellow
+        Write-Host "No automatic fuzzing will be performed." -ForegroundColor Gray
     }
     
     Write-Host "`n                                                                               === All checks completed ===`n" -ForegroundColor DarkGreen
@@ -1820,7 +2133,7 @@ function RunAllScans {
 function Help {
     Clear-Host
     Logo_Menu
-    Write-Host "`n                                                                          ==== HELP - PowerDiNSpec v2.1.9 ====`n" -ForegroundColor Red
+    Write-Host "`n                                                                          ==== HELP - PowerDiNSpec v2.2.5 ====`n" -ForegroundColor Red
 
     Write-Host "`n  POWERDINSPEC - PowerShell DNS Recon Tool" -ForegroundColor Yellow
     Write-Host "`n  PowerDiNSpec is a comprehensive PowerShell-based reconnaissance toolkit for" -ForegroundColor White
@@ -1849,7 +2162,15 @@ function Help {
     Write-Host "`n    [6] Technology Detection" -ForegroundColor Green
     Write-Host "        Identifies web technologies, frameworks, and server software through" -ForegroundColor White
     Write-Host "        header analysis and response patterns." -ForegroundColor Gray
-    Write-Host "`n    [7] Comprehensive DNS Records" -ForegroundColor Green
+    Write-Host "`n    [7] Security Headers Analysis" -ForegroundColor Green
+    Write-Host "        Comprehensive security headers audit including:" -ForegroundColor White
+    Write-Host "        - Content-Security-Policy, Strict-Transport-Security" -ForegroundColor Gray
+    Write-Host "        - X-Frame-Options, X-Content-Type-Options" -ForegroundColor Gray
+    Write-Host "        - Security scoring and recommendations" -ForegroundColor Gray
+    Write-Host "`n    [8] DNS Zone Transfer Test" -ForegroundColor Green
+    Write-Host "        Tests DNS servers for zone transfer vulnerabilities that could" -ForegroundColor White
+    Write-Host "        expose all DNS records of the domain." -ForegroundColor Gray
+    Write-Host "`n    [9] Comprehensive DNS Records" -ForegroundColor Green
     Write-Host "        Extensive DNS reconnaissance including:" -ForegroundColor White
     Write-Host "        - MX Records  - Mail server information" -ForegroundColor Gray
     Write-Host "        - NS Records  - Name servers" -ForegroundColor Gray
@@ -1857,39 +2178,92 @@ function Help {
     Write-Host "        - CNAME Records - Canonical name mappings" -ForegroundColor Gray
     Write-Host "        - TXT Records - SPF, DKIM, verification records" -ForegroundColor Gray
     Write-Host "        - PTR Records - Reverse DNS lookups" -ForegroundColor Gray
-    Write-Host "`n    [8] HTML Link Discovery" -ForegroundColor Green
+    Write-Host "`n    [10] HTML Link Discovery" -ForegroundColor Green
     Write-Host "        Extracts all HTTP/HTTPS links from page content to map internal and" -ForegroundColor White
     Write-Host "        external resources and identify potential attack surface." -ForegroundColor Gray
-    Write-Host "`n    [9] Robots.txt Analysis" -ForegroundColor Green
+    Write-Host "`n    [11] Robots.txt Analysis" -ForegroundColor Green
     Write-Host "        Retrieves and analyzes robots.txt files to discover hidden directories," -ForegroundColor White
     Write-Host "        disallowed paths, and potential sensitive areas." -ForegroundColor Gray
-    Write-Host "`n    [10] Sitemap Discovery" -ForegroundColor Green
+    Write-Host "`n    [12] Sitemap Discovery" -ForegroundColor Green
     Write-Host "        Checks for sitemap.xml files to understand site structure and" -ForegroundColor White
     Write-Host "        discover additional content paths." -ForegroundColor Gray
-    Write-Host "`n    [11] Port Banner Grabbing" -ForegroundColor Green
+    Write-Host "`n    [13] Port Banner Grabbing" -ForegroundColor Green
     Write-Host "        Advanced service detection on multiple ports with configurable presets:" -ForegroundColor White
     Write-Host "        - Common Services (21,22,80,443, etc.)" -ForegroundColor Gray
     Write-Host "        - Web Services (80,443,8080,8443, etc.)" -ForegroundColor Gray
     Write-Host "        - Database Ports (1433,1521,3306,5432, etc.)" -ForegroundColor Gray
     Write-Host "        - Email Services (25,110,143,465, etc.)" -ForegroundColor Gray
     Write-Host "        - Custom port ranges supported" -ForegroundColor Gray
-    Write-Host "`n    [12] Wordlist Generation for Fuzzing" -ForegroundColor Green
+    Write-Host "`n    [14] Wordlist Generation for Fuzzing" -ForegroundColor Green
     Write-Host "        Extracts unique words from HTML content to create customized wordlists" -ForegroundColor White
     Write-Host "        for directory brute-forcing, fuzzing, and content discovery." -ForegroundColor Gray
-    Write-Host "`n    [13] Run All Scans" -ForegroundColor Green
+    Write-Host "`n    [15] Fuzzing Recursivo Infinito" -ForegroundColor Green
+    Write-Host "        Advanced recursive directory fuzzing with features:" -ForegroundColor White
+    Write-Host "        - Infinite depth recursion on found directories" -ForegroundColor Gray
+    Write-Host "        - Real-time progress tracking" -ForegroundColor Gray
+    Write-Host "        - Automatic port discovery from HTML content" -ForegroundColor Gray
+    Write-Host "        - Multi-level directory discovery" -ForegroundColor Gray
+    Write-Host "`n    [16] Run All Scans" -ForegroundColor Green
     Write-Host "        Executes a comprehensive sequential assessment using all enabled scans" -ForegroundColor White
     Write-Host "        with configurable options and real-time progress display." -ForegroundColor Gray
+
+    Write-Host "`n  NEW FEATURES IN v2.2.5" -ForegroundColor Magenta
+    Write-Host "    - Auto Fuzzing Mode: Automatic recursive fuzzing after word extraction" -ForegroundColor White
+    Write-Host "    - Port Discovery: Automatically detects and tests ports from HTML content" -ForegroundColor White
+    Write-Host "    - Enhanced Wordlist Generation: Improved filtering and optimization" -ForegroundColor White
+    Write-Host "    - Recursive Fuzzing: Infinite depth directory discovery" -ForegroundColor White
+    Write-Host "    - Real-time Progress: Visual progress bars for long-running scans" -ForegroundColor White
+    Write-Host "    - Auto-save Functionality: Automatic wordlist saving for fuzzing" -ForegroundColor White
+
+    Write-Host "`n  AUTO FUZZING MODE" -ForegroundColor Cyan
+    Write-Host "    When enabled, automatically launches recursive fuzzing after word extraction:" -ForegroundColor White
+    Write-Host "    - Extracts words from HTML content" -ForegroundColor Gray
+    Write-Host "    - Automatically saves wordlist (even if user declines)" -ForegroundColor Gray
+    Write-Host "    - Launches recursive fuzzing with discovered words" -ForegroundColor Gray
+    Write-Host "    - Tests discovered ports automatically" -ForegroundColor Gray
+    Write-Host "    - Provides real-time progress and results" -ForegroundColor Gray
+
+    Write-Host "`n  PORT DISCOVERY INTELLIGENCE" -ForegroundColor Cyan
+    Write-Host "    Advanced port detection from HTML content:" -ForegroundColor White
+    Write-Host "    - Scans HTML for potential port numbers" -ForegroundColor Gray
+    Write-Host "    - Tests common web ports automatically" -ForegroundColor Gray
+    Write-Host "    - Auto-fuzzing on discovered live ports" -ForegroundColor Gray
+    Write-Host "    - Real-time port status reporting" -ForegroundColor Gray
+
     Write-Host "`n  CONFIGURATION FEATURES" -ForegroundColor Cyan
     Write-Host "    - Customizable scan selection and prioritization" -ForegroundColor White
     Write-Host "    - Configurable port ranges for banner grabbing" -ForegroundColor White
     Write-Host "    - Preset configurations for different assessment types" -ForegroundColor White
     Write-Host "    - Interactive configuration menus" -ForegroundColor White
+    Write-Host "    - Auto Fuzzing Mode toggle" -ForegroundColor White
+    Write-Host "    - Real-time configuration preview" -ForegroundColor White
+
+    Write-Host "`n  PRESET CONFIGURATIONS" -ForegroundColor Cyan
+    Write-Host "    Quick setup with optimized scan profiles:" -ForegroundColor White
+    Write-Host "    - Basic Recon: Essential information gathering" -ForegroundColor Gray
+    Write-Host "    - Web Application: Focus on web app security" -ForegroundColor Gray
+    Write-Host "    - Network & DNS: Infrastructure reconnaissance" -ForegroundColor Gray
+    Write-Host "    - Content Discovery: Directory and file enumeration" -ForegroundColor Gray
+    Write-Host "    - Security Audit: Comprehensive security checks" -ForegroundColor Gray
+    Write-Host "    - Stealth Mode: Minimal detection, maximum info" -ForegroundColor Gray
+    Write-Host "    - Penetration Test: Full aggressive assessment" -ForegroundColor Gray
+
     Write-Host "`n  OUTPUT & LOGGING" -ForegroundColor Cyan
     Write-Host "    - Structured console output with color coding" -ForegroundColor White
     Write-Host "    - Comprehensive log files with timestamps" -ForegroundColor White
     Write-Host "    - Automatic directory organization:" -ForegroundColor White
     Write-Host "      - Logs_PowerDns/ - Scan logs and activity records" -ForegroundColor Gray
     Write-Host "      - Fuzz_files/    - Generated wordlists for fuzzing" -ForegroundColor Gray
+    Write-Host "    - Real-time progress indicators" -ForegroundColor White
+    Write-Host "    - Detailed scan summaries and statistics" -ForegroundColor White
+
+    Write-Host "`n  PERFORMANCE OPTIMIZATIONS" -ForegroundColor Cyan
+    Write-Host "    - Parallel request processing" -ForegroundColor White
+    Write-Host "    - Configurable timeouts and delays" -ForegroundColor White
+    Write-Host "    - Intelligent wordlist optimization" -ForegroundColor White
+    Write-Host "    - Memory-efficient processing" -ForegroundColor White
+    Write-Host "    - Progressive result display" -ForegroundColor White
+
     Write-Host "`n  SECURITY, ETHICS AND LEGAL NOTICE" -ForegroundColor Yellow
     Write-Host "    [IMPORTANT] USE ONLY WITH EXPLICIT AUTHORIZATION" -ForegroundColor Red
     Write-Host "" -ForegroundColor White
@@ -1903,36 +2277,60 @@ function Help {
     Write-Host "    - Scanning systems without explicit written permission" -ForegroundColor Gray
     Write-Host "    - Testing outside of authorized scope" -ForegroundColor Gray
     Write-Host "    - Malicious or unauthorized activities" -ForegroundColor Gray
+    Write-Host "    - Network disruption or denial of service" -ForegroundColor Gray
     Write-Host "" -ForegroundColor White
     Write-Host "    You are solely responsible for ensuring proper authorization and" -ForegroundColor White
     Write-Host "    compliance with all applicable laws and regulations." -ForegroundColor White
+
     Write-Host "`n  INSTALLATION & USAGE" -ForegroundColor Cyan
     Write-Host "    Requirements:" -ForegroundColor White
     Write-Host "    - Windows PowerShell 5.1 or newer" -ForegroundColor Gray
     Write-Host "    - Internet connectivity for target access" -ForegroundColor Gray
     Write-Host "    - Appropriate execution policy settings" -ForegroundColor Gray
+    Write-Host "    - Administrative privileges for some scans" -ForegroundColor Gray
     Write-Host "" -ForegroundColor White
     Write-Host "    Quick Start:" -ForegroundColor White
     Write-Host "    1. Configure scans (Option 0 -> Configure Scans)" -ForegroundColor Gray
     Write-Host "    2. Set port ranges (Option 0 -> Configure Ports)" -ForegroundColor Gray
-    Write-Host "    3. Run individual scans or complete assessment" -ForegroundColor Gray
-    Write-Host "    4. Review logs in Logs_PowerDns/ directory" -ForegroundColor Gray
+    Write-Host "    3. Enable Auto Fuzzing if desired (Option 0 -> Auto Fuzzing)" -ForegroundColor Gray
+    Write-Host "    4. Run individual scans or complete assessment" -ForegroundColor Gray
+    Write-Host "    5. Review logs in Logs_PowerDns/ directory" -ForegroundColor Gray
+    Write-Host "    6. Check Fuzz_files/ for generated wordlists" -ForegroundColor Gray
+
+    Write-Host "`n  TIPS & BEST PRACTICES" -ForegroundColor Cyan
+    Write-Host "    - Start with Basic Recon preset for initial assessment" -ForegroundColor White
+    Write-Host "    - Use Stealth Mode for sensitive environments" -ForegroundColor White
+    Write-Host "    - Enable Auto Fuzzing for comprehensive directory discovery" -ForegroundColor White
+    Write-Host "    - Monitor scan progress and adjust timeouts as needed" -ForegroundColor White
+    Write-Host "    - Review logs for detailed scan information" -ForegroundColor White
+    Write-Host "    - Customize port ranges based on target environment" -ForegroundColor White
+
     Write-Host "`n  CREDITS" -ForegroundColor Cyan
     Write-Host "    - Author: Luan Calazans (2025)" -ForegroundColor White
     Write-Host "    - PowerShell-based toolkit design and implementation: Luan Calazans" -ForegroundColor White
     Write-Host "    - Menu ASCII fonts and artwork assistance: WriteAscii project" -ForegroundColor White
     Write-Host "      Font and artwork source: https://github.com/EliteLoser/WriteAscii/blob/master/letters.xml" -ForegroundColor White
-    Write-Host "    - Please respect the original font/artwork author and license when" -ForegroundColor White
+    Write-Host "    - Community contributions and testing" -ForegroundColor White
+
     Write-Host "`n  LICENSE" -ForegroundColor Cyan
     Write-Host "    GNU Affero General Public License v3.0" -ForegroundColor White
     Write-Host "    This program is free software: you can redistribute it and/or modify" -ForegroundColor Gray
     Write-Host "    it under the terms of the GNU AGPLv3. See LICENSE file for details." -ForegroundColor Gray
+
     Write-Host "`n  REPOSITORY & SUPPORT" -ForegroundColor Cyan
     Write-Host "    GitHub: https://github.com/Luanqmata/PowerDiNSpec" -ForegroundColor White
     Write-Host "    Issues and contributions welcome via GitHub repository." -ForegroundColor Gray
+    Write-Host "    Documentation: Included in help system and repository wiki" -ForegroundColor Gray
+
+    Write-Host "`n  VERSION INFORMATION" -ForegroundColor Cyan
+    Write-Host "    Current Version: 2.2.0" -ForegroundColor White
+    Write-Host "    Release Date: 2025" -ForegroundColor White
+    Write-Host "    Compatibility: Windows PowerShell 5.1+" -ForegroundColor White
+
     Write-Host "`n  FINAL REMINDER" -ForegroundColor Red
     Write-Host "    USE RESPONSIBLY - GET AUTHORIZATION - RESPECT PRIVACY - FOLLOW ETHICS" -ForegroundColor Yellow
     Write-Host "    This tool is for defensive security purposes only." -ForegroundColor White
+    Write-Host "    Your actions are your responsibility - always obtain proper authorization." -ForegroundColor White
 
     Write-Host "`n  Press Enter to return to the submenu..." -ForegroundColor DarkGray
     $null = Read-Host
@@ -1965,6 +2363,7 @@ function PowerDiNSpec {
             "Check if Site has a Sitemap",
             "Capture Port's Banner's",
             "Get All Words from the Site",
+            "Fuzzing Recursive ",
             "Run All Scans (1 to 14)",
             "Exit"
         )
@@ -2006,24 +2405,36 @@ function PowerDiNSpec {
                         "Back Menu",
                         "Help",
                         "Configure: Cap'port Banner - Option [13]",
-                        "Configure: RunAllScans - Option [15]"
+                        "Configure: RunAllScans - Option [15]",
+                        "Disable: Auto Fuzzing Mode - Option [16]"
                     )
 
                     for ($i = 0; $i -lt $submenu.Count; $i++) {
-                        $spacing = " " * 57
-                        Write-Host -NoNewline "$spacing["
-                        Write-Host -NoNewline (" {0} " -f $i) -ForegroundColor Green
-                        Write-Host "]   " -NoNewline
+                    $spacing = " " * 57
+                    Write-Host -NoNewline "$spacing["
+                    Write-Host -NoNewline (" {0} " -f $i) -ForegroundColor Green
+                    Write-Host "]   " -NoNewline
+                    
+                    if ($i -eq 4) {
+                        if ($global:AutoFuzzingMode -eq 1) {
+                            Write-Host -NoNewline "Enable" -ForegroundColor Green
+                            Write-Host ": Auto Fuzzing Mode - Option [16]" -ForegroundColor Magenta
+                        } else {
+                            Write-Host -NoNewline "Disable" -ForegroundColor Red
+                            Write-Host ": Auto Fuzzing Mode - Option [16]" -ForegroundColor Magenta
+                        }
+                    } else {
                         Write-Host "$($submenu[$i])" -ForegroundColor Yellow
-                        Write-Host ""
                     }
                     
+                    Write-Host ""
+                }
                     Write-host "`n`n`n"
-                    $option_costumization = Show-InputPrompt -input_name "Choose an option (0-3)" -PaddingLeft 35
+                    $option_costumization = Show-InputPrompt -input_name "Choose an option (0-4)" -PaddingLeft 35
 
                     $choice = 0 
                     if (-not [int]::TryParse($option_costumization, [ref]$choice)) {
-                        Write-Host "`n`n`n               Invalid option. Choose a number between 0 and 3." -ForegroundColor Red
+                        Write-Host "`n`n`n               Invalid option. Choose a number between 0 and 4." -ForegroundColor Red
                         Write-Host "`n               Press Enter to continue..." -ForegroundColor Gray
                         $null = Read-Host
                         continue
@@ -2055,13 +2466,28 @@ function PowerDiNSpec {
                             }
                             continue
                         }
+                        4 {
+                            $global:AutoFuzzingMode = 1 - $global:AutoFuzzingMode
+                            
+                            if ($global:AutoFuzzingMode -eq 1) {
+                                Write-Host "`n Auto Fuzzing Mode ENABLED" -ForegroundColor Green
+                                Write-Host "   After word extraction, recursive fuzzing will run automatically" -ForegroundColor White
+                            } else {
+                                Write-Host "`n Auto Fuzzing Mode DISABLED" -ForegroundColor Red
+                                Write-Host "   Only word extraction will be performed" -ForegroundColor White
+                            }
+                            
+                            Write-Log "Auto Fuzzing Mode toggled to: $global:AutoFuzzingMode"
+
+                        }
                         default {
-                            Write-Host "`n`n               Invalid option. Choose a number between 0 and 3." -ForegroundColor Red
+                            Write-Host "`n`n               Invalid option. Choose a number between 0 and 4." -ForegroundColor Red
                             Write-Host "`n               Press Enter to continue..." -ForegroundColor Gray
                             $null = Read-Host
                             continue
                         }
-                    }
+                    } # ← Fecha o switch principal do submenu
+                    
                     if ($choice -eq 0) { break }
                 }
             }
@@ -2253,6 +2679,28 @@ function PowerDiNSpec {
                 Write-Host ""
                 $url = Show-InputPrompt -input_name "Enter the website URL (ex: http://scanme.nmap.org)" -PaddingLeft 19
                 if (Test-ValidUrl $url) {
+                    # Primeiro 16 as palavras
+                    $resultadoScan = ScanHTML -url $url
+                    
+                    if ($resultadoScan.SavedFilePath -and (Test-Path $resultadoScan.SavedFilePath)) {
+                        Write-Host "`nStarting recursive fuzzing automatically..." -ForegroundColor Cyan
+                        Start-Sleep -Seconds 2
+                        Start-FuzzingRecursive -url $url -wordlist $resultadoScan.SavedFilePath
+                    } else {
+                        Write-Host "`nFuzzing cancelled - no wordlist file was saved." -ForegroundColor Yellow
+                    }
+                } else {
+                    Write-Host "`n               Invalid URL. Use http:// or https://" -ForegroundColor Red
+                }
+                Write-Host "`nPress Enter to continue..." -ForegroundColor Gray
+                $null = Read-Host
+            }
+            16 {
+                Clear-Host
+                Logo_Menu
+                Write-Host ""
+                $url = Show-InputPrompt -input_name "Enter the website URL (ex: http://scanme.nmap.org)" -PaddingLeft 19
+                if (Test-ValidUrl $url) {
                     RunAllScans -url $url
                 } else {
                     Write-Host "`n               Invalid URL. Use http:// or https://" -ForegroundColor Red
@@ -2260,7 +2708,7 @@ function PowerDiNSpec {
                     $null = Read-Host
                 }
             }
-            16 {
+            17 {
                 Clear-Host
                 Logo_Menu
                 Write-Host ""
@@ -2277,6 +2725,7 @@ function PowerDiNSpec {
                 Start-Sleep -Seconds 1.5
                 return
             }
+            
             default {
                 Write-Host "`n`n               Invalid option. Choose a number between 0 and 16." -ForegroundColor Red
                 Write-Host "`n               Press Enter to continue..." -ForegroundColor Gray
