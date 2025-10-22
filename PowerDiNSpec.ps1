@@ -1785,11 +1785,11 @@ function ScanHTML {
         }
     }
 }
-
 function Start-FuzzingRecursive {
     param(
         [string]$url,
-        [string]$wordlist
+        [string]$wordlist,
+        [int]$MaxDepth = 5  # ✅ NOVO: Limite máximo de profundidade
     )
     
     try {
@@ -1811,6 +1811,7 @@ function Start-FuzzingRecursive {
         Write-Host "[FUZZING] Target: $url" -ForegroundColor White
         Write-Host "[FUZZING] Total words: $totalWords" -ForegroundColor White
         Write-Host "[FUZZING] Mode: Recursive Mode" -ForegroundColor Magenta
+        Write-Host "[FUZZING] Max Depth: $MaxDepth" -ForegroundColor White  # ✅ NOVO
         Write-Host "[FUZZING] Delay: 50ms (Optimized)" -ForegroundColor White
         Write-Host "[FUZZING] Starting...`n" -ForegroundColor Green
         
@@ -1822,8 +1823,15 @@ function Start-FuzzingRecursive {
             param(
                 [string]$baseUrl,
                 [string[]]$wordlist,
-                [int]$depth = 1
+                [int]$depth = 1,
+                [int]$maxDepth = 5  # ✅ NOVO: Parâmetro de profundidade máxima
             )
+            
+            # ✅ NOVO: Verificar se atingiu a profundidade máxima
+            if ($depth -gt $maxDepth) {
+                Write-Host "    [MAX DEPTH REACHED] Stopping recursion at depth $depth" -ForegroundColor Yellow
+                return @()
+            }
             
             $localResults = @()
             $localCounter = 0
@@ -1839,15 +1847,15 @@ function Start-FuzzingRecursive {
                     $currentDir = "ROOT"
                 }
                 
-                Write-Progress -Activity "Infinite Recursive Fuzzing" `
-                             -Status "Directory: /$currentDir | Level: $depth | Word: $localCounter/$($wordlist.Count) ($percentComplete%)" `
+                Write-Progress -Activity "Recursive Fuzzing" `
+                             -Status "Directory: /$currentDir | Level: $depth/$maxDepth | Word: $localCounter/$($wordlist.Count) ($percentComplete%)" `
                              -PercentComplete $percentComplete `
                              -CurrentOperation "Testing: $word"
                 
                 try {
                     $request = [System.Net.WebRequest]::Create($testUrl)
                     $request.Method = "HEAD"
-                    $request.Timeout = 3000  # 3 seconds instead of 5
+                    $request.Timeout = 3000
                     $request.UserAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
                     
                     $response = $request.GetResponse()
@@ -1876,12 +1884,18 @@ function Start-FuzzingRecursive {
                             Write-Host "  [$statusCode] Level $depth - $testUrl" -ForegroundColor White
                         }
 
-                        if ($statusCode -eq 200) {
+                        # ✅ MELHORIA: Só faz recursão para diretórios "reais", não para palavras comuns
+                        $commonWords = @('_blank', '_self', '_parent', '_top', 'blank', 'self', 'null', 'undefined', 'true', 'false', 'yes', 'no', 'on', 'off', 'active')
+                        $isCommonWord = $commonWords -contains $word
+                        
+                        if ($statusCode -eq 200 -and -not $isCommonWord) {
                             Write-Host "    -> Directory found! Continuing recursion at level $(($depth + 1))..." -ForegroundColor Cyan
-                            $recursiveResults = Invoke-RecursiveFuzzing -baseUrl $testUrl -wordlist $wordlist -depth ($depth + 1)
+                            $recursiveResults = Invoke-RecursiveFuzzing -baseUrl $testUrl -wordlist $wordlist -depth ($depth + 1) -maxDepth $maxDepth
                             if ($recursiveResults) {
                                 $localResults += $recursiveResults
                             }
+                        } elseif ($statusCode -eq 200 -and $isCommonWord) {
+                            Write-Host "    -> Common word '$word' found, skipping recursion to avoid loops" -ForegroundColor Gray
                         }
                     }
                     
@@ -1898,14 +1912,14 @@ function Start-FuzzingRecursive {
             
             # Clear progress bar when this level completes
             if ($depth -eq 1) {
-                Write-Progress -Activity "Infinite Recursive Fuzzing" -Completed
+                Write-Progress -Activity "Recursive Fuzzing" -Completed
             }
             
             return $localResults
         }
         
-        Write-Host "[FUZZING] Starting infinite recursive fuzzing (Optimized)..." -ForegroundColor Magenta
-        $results = Invoke-RecursiveFuzzing -baseUrl $url -wordlist $wordsToUse -depth 1
+        Write-Host "[FUZZING] Starting recursive fuzzing (Max Depth: $MaxDepth)..." -ForegroundColor Magenta
+        $results = Invoke-RecursiveFuzzing -baseUrl $url -wordlist $wordsToUse -depth 1 -maxDepth $MaxDepth
         
         if ($results -and $results.Count -gt 0) {
             foreach ($result in $results) {
