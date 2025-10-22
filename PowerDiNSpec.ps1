@@ -1665,7 +1665,6 @@ function Configure-ScansInteractive {
 # =============================================
 # Fuzzing Functions
 # =============================================
-
 function ScanHTML {
     param ([string]$url)
     try {
@@ -1676,104 +1675,63 @@ function ScanHTML {
         $response = Invoke-WebRequestSafe -Uri $url
         $htmlContent = $response.Content
 
-        $cleanContent = $htmlContent -replace '[^\x00-\x7F]', ' '
-        $cleanContent = $cleanContent -replace '&[a-z]+;', ' '
-        
-        $palavras = ($cleanContent -split '[^\p{L}0-9_\-]+') |
-                    Where-Object { 
-                        $_.Length -gt 2 -and 
-                        -not $_.StartsWith('#') -and 
-                        -not $_.StartsWith('//') -and
-                        -not $_.StartsWith('http') -and
-                        -not $_.Contains('://') -and
-                        -not ($_ -match '^\d+$')
-                    } |
+        # Extract words with improved regex - SEM FILTROS COMPLEXOS
+        $palavras = ($htmlContent -split '[^\p{L}0-9_\-]+') |
+                    Where-Object { $_.Length -gt 2 } |  # Apenas remove palavras muito curtas
                     Select-Object -Unique |
                     Sort-Object
 
-        $commonWords = @(
-            'n0n9', 'div', 'span', 'html', 'head', 'body', 'script', 'style', 'css', 
-            'class', 'id', 'src', 'href', 'alt', 'title', 'meta', 'link', 'img', 
-            'input', 'button', 'form', 'table', 'tr', 'td', 'th', 'ul', 'ol', 'li',
-            'p', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'br', 'hr', 'nav', 'header',
-            'footer', 'section', 'article', 'aside', 'main', 'DOCTYPE', 'utf-8',
-            'viewport', 'initial-scale', 'maximum-scale', 'device-width', 'charset',
-            'stylesheet', 'javascript', 'jquery', 'modernizr', 'waypoints', 'smoothscroll',
-            'backstretch', 'preloader', 'no-js', 'ie7', 'ie8', 'googleapis', 'png',
-            'gif', 'favicon', 'php', 'json', 'xml'
-        )
-        
-        $palavras = $palavras | Where-Object { 
-            $commonWords -notcontains $_.ToLower() -and
-            -not $_.StartsWith('fa-') -and  # Remove Font Awesome classes
-            -not $_.StartsWith('js-') -and   # Remove classes JS
-            -not $_.EndsWith('.js') -and     # Remove arquivos JS
-            -not $_.EndsWith('.css')         # Remove arquivos CSS
-        }
+        # Remove apenas palavras extremamente comuns se necessário
+        $commonWords = @('div', 'span', 'html', 'head', 'body', 'script', 'style', 'css')
+        $palavras = $palavras | Where-Object { $commonWords -notcontains $_.ToLower() }
 
-        Write-Host "`nTotal unique words found: $($palavras.Count)" -ForegroundColor Gray
+        Write-Host "`nTotal unique words found: $($palavras.Count)" -ForegroundColor Green
         Write-Log "Found $($palavras.Count) unique words for fuzzing"
 
         if ($palavras.Count -gt 0) {
-            Write-Host "`nExample of found words (first 10):" -ForegroundColor Yellow
-            $palavras | Select-Object -First 10 | ForEach-Object {
+            Write-Host "`nExample of found words (first 15):" -ForegroundColor Yellow
+            $palavras | Select-Object -First 15 | ForEach-Object {
                 Write-Host "   $_" -ForegroundColor White
             }
 
-            $save = Read-Host "`nDo you want to save the words to a file for fuzzing? (Y/N)"
+            # Salvamento automático ou por confirmação
+            $save = "Y"
+            if ($global:AutoFuzzingMode -ne 1) {
+                $save = Read-Host "`nDo you want to save the words to a file for fuzzing? (Y/N)"
+            }
 
-            $savedFilePath = $null
-            $autoSaveForFuzzing = $false
-
-            if ($save -eq 'Y' -or $save -eq 'y') {
+            if ($save -eq 'Y' -or $save -eq 'y' -or $global:AutoFuzzingMode -eq 1) {
                 $fuzzingDir = "Fuzz_files"
                 if (-not (Test-Path $fuzzingDir)) {
                     New-Item -ItemType Directory -Path $fuzzingDir -Force | Out-Null
                     Write-Host "`nCreated directory: $fuzzingDir" -ForegroundColor Green
                 }
 
-                $filePath = Read-Host "`nEnter the file name (default: words_fuzzing.txt)"
-
-                if ([string]::IsNullOrEmpty($filePath)) {
-                    $filePath = "words_fuzzing.txt"
-                }
-                
+                $timestamp = Get-Date -Format "yyyyMMdd_HHmmss"
+                $domainName = ([System.Uri]$url).Host -replace '\.', '_'
+                $filePath = "wordlist_${domainName}_${timestamp}.txt"
                 $fullPath = Join-Path $fuzzingDir $filePath
+                
                 $palavras | Out-File -FilePath $fullPath -Encoding UTF8
                 
                 Write-Host "`nWords saved to: $fullPath" -ForegroundColor Green
-                Write-Host "Full path: $((Get-Item $fullPath).FullName)" -ForegroundColor Gray
+                Write-Host "Total words: $($palavras.Count)" -ForegroundColor Gray
                 Write-Log "Words saved to: $fullPath"
-                
-                $savedFilePath = $fullPath
-                
-            }
-            elseif (($save -eq 'N' -or $save -eq 'n') -and $global:AutoFuzzingMode -eq 1) {
-                Write-Host "`nAuto Fuzzing is ENABLED. Saving wordlist automatically for immediate use..." -ForegroundColor Yellow
-                $fuzzingDir = "Fuzz_files"
-                if (-not (Test-Path $fuzzingDir)) {
-                    New-Item -ItemType Directory -Path $fuzzingDir -Force | Out-Null
+
+                return @{
+                    Words = $palavras
+                    SavedFilePath = $fullPath
+                    TotalWords = $palavras.Count
                 }
-                $autoFilePath = Join-Path $fuzzingDir "temp_autofuzz_$(Get-Date -Format 'HHmmss').txt"
-                $palavras | Out-File -FilePath $autoFilePath -Encoding UTF8
-                Write-Host "Wordlist saved automatically for Auto Fuzzing to: $autoFilePath" -ForegroundColor Gray
-                Write-Log "Wordlist auto-saved for Auto Fuzzing: $autoFilePath" "INFO"
-                $savedFilePath = $autoFilePath
             }
-            
-            return @{
-                Words = $palavras
-                SavedFilePath = $savedFilePath
-                TotalWords = $palavras.Count
-            }
-            
         } else {
             Write-Host "`nNo relevant words were found in the HTML." -ForegroundColor Red
-            return @{
-                Words = @()
-                SavedFilePath = $null
-                TotalWords = 0
-            }
+        }
+
+        return @{
+            Words = $palavras
+            SavedFilePath = $null
+            TotalWords = $palavras.Count
         }
 
     } catch {
@@ -1785,194 +1743,376 @@ function ScanHTML {
         }
     }
 }
+
 function Start-FuzzingRecursive {
     param(
         [string]$url,
         [string]$wordlist,
-        [int]$MaxDepth = 5  # ✅ NOVO: Limite máximo de profundidade
+        [int]$MaxDepth = 2,
+        [int]$TimeoutMs = 3000,
+        [switch]$Aggressive = $false,
+        [int]$MaxThreads = 5
     )
     
     try {
-        Write-Host "`n[RECURSIVE FUZZING] Starting Recursive Fuzzing..." -ForegroundColor Yellow
+        Write-Host "`n[ADVANCED RECURSIVE FUZZING]" -ForegroundColor Magenta
+        Write-Host "   Target: $url" -ForegroundColor White
+        Write-Host "   Wordlist: $wordlist" -ForegroundColor White
         
         if (-not (Test-Path $wordlist)) {
-            Write-Host "[FUZZING] X Wordlist file not found: $wordlist" -ForegroundColor Red
-            return
-        }
-    
-        $wordsToUse = [System.IO.File]::ReadAllLines($wordlist)
-        $totalWords = $wordsToUse.Count
-        
-        if ($totalWords -eq 0) {
-            Write-Host "[FUZZING] X No words available for fuzzing." -ForegroundColor Red
-            return
+            Write-Host "[ERROR] Wordlist not found: $wordlist" -ForegroundColor Red
+            return @()
         }
 
-        Write-Host "[FUZZING] Target: $url" -ForegroundColor White
-        Write-Host "[FUZZING] Total words: $totalWords" -ForegroundColor White
-        Write-Host "[FUZZING] Mode: Recursive Mode" -ForegroundColor Magenta
-        Write-Host "[FUZZING] Max Depth: $MaxDepth" -ForegroundColor White  # ✅ NOVO
-        Write-Host "[FUZZING] Delay: 50ms (Optimized)" -ForegroundColor White
-        Write-Host "[FUZZING] Starting...`n" -ForegroundColor Green
+        $words = [System.IO.File]::ReadAllLines($wordlist) | Where-Object { 
+            -not [string]::IsNullOrEmpty($_) -and $_.Length -gt 2 
+        }
         
-        $allResults = New-Object System.Collections.ArrayList
+        if ($words.Count -eq 0) {
+            Write-Host "[ERROR] No valid words in wordlist" -ForegroundColor Red
+            return @()
+        }
+
+        # CONFIGURAÇÕES INTELIGENTES
+        $baseUri = [System.Uri]$url
+        $baseUrl = $baseUri.GetLeftPart([System.UriPartial]::Path)
+        $baseHost = $baseUri.Host
+        
+        # Garante que a base URL termina com /
+        if (-not $baseUrl.EndsWith('/')) {
+            $baseUrl += '/'
+        }
+        
+        Write-Host "`n[CONFIG]" -ForegroundColor Cyan
+        Write-Host "  Words: $($words.Count)" -ForegroundColor Gray
+        Write-Host "  Max Depth: $MaxDepth" -ForegroundColor Gray
+        Write-Host "  Timeout: ${TimeoutMs}ms" -ForegroundColor Gray
+
+        # SISTEMA AVANÇADO DE DETECÇÃO DE BASE
+        Write-Host "`n[ANALYSIS] Analyzing base page..." -ForegroundColor Cyan
+        $baseSignature = Get-PageSignature -Url $url
+        
+        if (-not $baseSignature) {
+            Write-Host "[WARNING] Could not analyze base page" -ForegroundColor Yellow
+            return @()
+        }
+
+        Write-Host "  Base Page: $($baseSignature.Title)" -ForegroundColor Gray
+        Write-Host "  Size: $($baseSignature.ContentLength) chars" -ForegroundColor Gray
+        Write-Host "  Hash: $($baseSignature.ContentHash)" -ForegroundColor Gray
+
+        # RESULTADOS E CONTROLE DE DUPLICATAS
+        $allResults = [System.Collections.ArrayList]::new()
+        $visitedUrls = @{}  # Hash table para URLs já visitadas
+        $contentHashes = @{} # Hash table para conteúdos já vistos
         $totalRequests = 0
-        $currentDepth = 0
-        
-        function Invoke-RecursiveFuzzing {
-            param(
-                [string]$baseUrl,
-                [string[]]$wordlist,
-                [int]$depth = 1,
-                [int]$maxDepth = 5  # ✅ NOVO: Parâmetro de profundidade máxima
-            )
+        $validEndpoints = 0
+        $duplicatesFiltered = 0
+        $startTime = Get-Date
+
+        # FUNÇÃO DE TESTE OTIMIZADA
+        function Test-Endpoint {
+            param($testUrl, $currentDepth, $parentWord)
             
-            # ✅ NOVO: Verificar se atingiu a profundidade máxima
-            if ($depth -gt $maxDepth) {
-                Write-Host "    [MAX DEPTH REACHED] Stopping recursion at depth $depth" -ForegroundColor Yellow
-                return @()
+            # Verifica se URL já foi visitada
+            if ($visitedUrls.ContainsKey($testUrl)) {
+                $script:duplicatesFiltered++
+                return $false
             }
+            $visitedUrls[$testUrl] = $true
             
-            $localResults = @()
-            $localCounter = 0
-            $script:currentDepth = $depth
-            
-            foreach ($word in $wordlist) {
-                $localCounter++
-                $testUrl = "$baseUrl/$word"
-                
-                $percentComplete = [math]::Round(($localCounter / $wordlist.Count) * 100, 1)
-                $currentDir = $baseUrl.Replace($url, "").Trim('/')
-                if ([string]::IsNullOrEmpty($currentDir)) {
-                    $currentDir = "ROOT"
+            try {
+                # VALIDAÇÃO DA URL ANTES DO REQUEST
+                if (-not $testUrl.StartsWith('http')) {
+                    return $false
                 }
                 
-                Write-Progress -Activity "Recursive Fuzzing" `
-                             -Status "Directory: /$currentDir | Level: $depth/$maxDepth | Word: $localCounter/$($wordlist.Count) ($percentComplete%)" `
-                             -PercentComplete $percentComplete `
-                             -CurrentOperation "Testing: $word"
+                $request = [System.Net.WebRequest]::Create($testUrl)
+                $request.Timeout = $TimeoutMs
+                $request.Method = "GET"
+                $request.UserAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
                 
-                try {
-                    $request = [System.Net.WebRequest]::Create($testUrl)
-                    $request.Method = "HEAD"
-                    $request.Timeout = 3000
-                    $request.UserAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
-                    
-                    $response = $request.GetResponse()
-                    $statusCode = [int]$response.StatusCode
-                    $contentLength = $response.Headers["Content-Length"]
-                    $response.Close()
-                    
-                    if ($statusCode -ne 404) {
-                        $result = [PSCustomObject]@{
-                            URL = $testUrl
-                            StatusCode = $statusCode
-                            ContentLength = $contentLength
-                            Word = $word
-                            Depth = $depth
-                        }
-                        
-                        $localResults += $result
-                        
-                        if ($statusCode -eq 200) {
-                            Write-Host "  [200] Level $depth - $testUrl" -ForegroundColor Green
-                        } elseif ($statusCode -eq 301 -or $statusCode -eq 302) {
-                            Write-Host "  [$statusCode] Level $depth - $testUrl" -ForegroundColor Yellow
-                        } elseif ($statusCode -eq 403 -or $statusCode -eq 401) {
-                            Write-Host "  [$statusCode] Level $depth - $testUrl" -ForegroundColor Red
-                        } else {
-                            Write-Host "  [$statusCode] Level $depth - $testUrl" -ForegroundColor White
-                        }
+                $response = $request.GetResponse()
+                $statusCode = [int]$response.StatusCode
+                $contentLength = $response.ContentLength
+                $contentStream = $response.GetResponseStream()
+                
+                # Lê o conteúdo completo para análise
+                $reader = New-Object System.IO.StreamReader($contentStream)
+                $fullContent = $reader.ReadToEnd()
+                $reader.Close()
+                $contentStream.Close()
+                $response.Close()
 
-                        # ✅ MELHORIA: Só faz recursão para diretórios "reais", não para palavras comuns
-                        $commonWords = @('_blank', '_self', '_parent', '_top', 'blank', 'self', 'null', 'undefined', 'true', 'false', 'yes', 'no', 'on', 'off', 'active')
-                        $isCommonWord = $commonWords -contains $word
-                        
-                        if ($statusCode -eq 200 -and -not $isCommonWord) {
-                            Write-Host "    -> Directory found! Continuing recursion at level $(($depth + 1))..." -ForegroundColor Cyan
-                            $recursiveResults = Invoke-RecursiveFuzzing -baseUrl $testUrl -wordlist $wordlist -depth ($depth + 1) -maxDepth $maxDepth
-                            if ($recursiveResults) {
-                                $localResults += $recursiveResults
-                            }
-                        } elseif ($statusCode -eq 200 -and $isCommonWord) {
-                            Write-Host "    -> Common word '$word' found, skipping recursion to avoid loops" -ForegroundColor Gray
-                        }
+                # Calcula hash do conteúdo
+                $contentHash = [System.BitConverter]::ToString(
+                    [System.Security.Cryptography.MD5]::Create().ComputeHash(
+                        [System.Text.Encoding]::UTF8.GetBytes($fullContent)
+                    )
+                ).Replace("-", "").ToLower()
+
+                # Verifica se já vimos este conteúdo antes (SILENCIOSAMENTE)
+                if ($contentHashes.ContainsKey($contentHash)) {
+                    $script:duplicatesFiltered++
+                    return $false
+                }
+                $contentHashes[$contentHash] = $true
+
+                # DETECÇÃO AVANÇADA DE FALSOS POSITIVOS
+                $isValidEndpoint = Test-RealEndpoint -Url $testUrl -Content $fullContent -ContentLength $contentLength -BaseSignature $baseSignature
+
+                if ($isValidEndpoint) {
+                    $title = if ($fullContent -match '<title[^>]*>(.*?)</title>') { 
+                        $matches[1].Trim() 
+                    } else { $null }
+                    
+                    $result = [PSCustomObject]@{
+                        URL = $testUrl
+                        StatusCode = $statusCode
+                        ContentLength = $contentLength
+                        Word = $parentWord
+                        Depth = $currentDepth
+                        IsValid = $true
+                        Title = $title
+                        ContentHash = $contentHash
+                        Timestamp = Get-Date
                     }
                     
-                } catch [System.Net.WebException] {
-                    # Silently ignore 404 errors
-                } catch {
-                    # Other errors are ignored for performance
+                    $allResults.Add($result) | Out-Null
+                    $script:validEndpoints++
+                    
+                    Write-Host "[REAL $statusCode] Depth $currentDepth - $testUrl" -ForegroundColor Green
+                    if ($title) {
+                        Write-Host "       Title: $title" -ForegroundColor Cyan
+                    }
+                    
+                    return $true
+                } else {
+                    # Mostra apenas FALSE quando for realmente diferente (não duplicado)
+                    if (-not $contentHashes.ContainsKey($contentHash)) {
+                        Write-Host "[FALSE $statusCode] $testUrl" -ForegroundColor Gray
+                    }
+                    return $false
                 }
                 
-                Start-Sleep -Milliseconds 50
-                
+            } catch [System.Net.WebException] {
+                # Ignora 404, timeout, etc silenciosamente
+                return $false
+            } catch {
+                return $false
+            } finally {
                 $script:totalRequests++
             }
-            
-            # Clear progress bar when this level completes
-            if ($depth -eq 1) {
-                Write-Progress -Activity "Recursive Fuzzing" -Completed
-            }
-            
-            return $localResults
         }
-        
-        Write-Host "[FUZZING] Starting recursive fuzzing (Max Depth: $MaxDepth)..." -ForegroundColor Magenta
-        $results = Invoke-RecursiveFuzzing -baseUrl $url -wordlist $wordsToUse -depth 1 -maxDepth $MaxDepth
-        
-        if ($results -and $results.Count -gt 0) {
-            foreach ($result in $results) {
-                [void]$allResults.Add($result)
-            }
-        }
-        
-        Write-Progress -Activity "Fuzzing" -Completed
-        
-        Write-Host "`n[FUZZING] OK Scan completed!" -ForegroundColor Green
-        Write-Host "[FUZZING] Total words in wordlist: $totalWords" -ForegroundColor White
-        Write-Host "[FUZZING] Total requests made: $totalRequests" -ForegroundColor White
-        Write-Host "[FUZZING] Interesting results found: $($allResults.Count)" -ForegroundColor Cyan
-        
-        if ($allResults.Count -gt 0) {
-            $maxDepth = ($allResults | Measure-Object -Property Depth -Maximum).Maximum
-            $avgDepth = ($allResults | Measure-Object -Property Depth -Average).Average
-            Write-Host "[FUZZING] Maximum depth reached: $maxDepth" -ForegroundColor Magenta
-            Write-Host "[FUZZING] Average depth: $([math]::Round($avgDepth, 1))" -ForegroundColor Magenta
-        }
-        
-        if ($allResults.Count -gt 0) {
-            Write-Host "`n[FUZZING] RESULTS FOUND:" -ForegroundColor Yellow
+
+        # RECURSÃO INTELIGENTE COM CONTROLE DE DUPLICATAS
+        function Invoke-SmartRecursion {
+            param($basePath, $wordList, $currentDepth, $maxDepth)
             
-            if ($allResults.Count -gt 50) {
-                Write-Host "  (Showing first 50 of $($allResults.Count) results)" -ForegroundColor Gray
-                $allResults | Sort-Object Depth, URL | Select-Object -First 50 | Format-Table URL, StatusCode, Depth, ContentLength -AutoSize
-            } else {
-                $allResults | Sort-Object Depth, URL | Format-Table URL, StatusCode, Depth, ContentLength -AutoSize
-            }
+            if ($currentDepth -gt $maxDepth) { return }
             
-            Write-Host "`n[FUZZING] Do you want to save the results to a file?" -ForegroundColor Yellow
-            $saveResults = Read-Host "   (Y) Yes / (N) No [Default: N]"
+            $testedCount = 0
+            $validPathsThisLevel = @()
             
-            if ($saveResults -eq 'Y' -or $saveResults -eq 'y') {
-                $fuzzingDir = "Fuzz_files"
-                if (-not (Test-Path $fuzzingDir)) {
-                    New-Item -ItemType Directory -Path $fuzzingDir -Force | Out-Null
+            foreach ($word in $wordList) {
+                # CONSTRUÇÃO SEGURA DA URL
+                $testUrl = if ($basePath.EndsWith('/')) {
+                    "$basePath$word"
+                } else {
+                    "$basePath/$word"
                 }
                 
-                $timestamp = Get-Date -Format "yyyyMMdd_HHmmss"
-                $outputFile = Join-Path $fuzzingDir "fuzzing_recursive_results_$timestamp.csv"
-                $allResults | Export-Csv -Path $outputFile -NoTypeInformation -Encoding UTF8
+                # VALIDAÇÃO DA URL
+                try {
+                    $uri = [System.Uri]$testUrl
+                } catch {
+                    continue
+                }
                 
-                Write-Host "`n[FUZZING] OK Results saved to: $outputFile" -ForegroundColor Green
+                # PALAVRAS QUE NUNCA DEVEM RECURSAR
+                $noRecursionWords = @('css', 'js', 'img', 'images', 'assets', 'static', 'media', 'fonts', 'wp-content', 'wp-includes')
+                $isNoRecursion = $noRecursionWords -contains $word.ToLower()
+                
+                # PROGRESSO (mostra a cada 25 requests para não poluir)
+                $testedCount++
+                if ($testedCount % 25 -eq 0) {
+                    Write-Progress -Activity "Depth $currentDepth" -Status "Tested: $testedCount/$($wordList.Count)" -PercentComplete ([math]::Round(($testedCount / $wordList.Count) * 100, 1))
+                }
+                
+                # TESTE DO ENDPOINT
+                $isValid = Test-Endpoint -testUrl $testUrl -currentDepth $currentDepth -parentWord $word
+                
+                if ($isValid) {
+                    $validPathsThisLevel += $word
+                }
+                
+                # DELAY ENTRE REQUESTS
+                Start-Sleep -Milliseconds (Get-Random -Minimum 50 -Maximum 150)
             }
-        } else {
-            Write-Host "[FUZZING] No interesting results found." -ForegroundColor Gray
+            
+            Write-Progress -Activity "Depth $currentDepth" -Completed
+            
+            # RECURSÃO APENAS PARA PATHS VÁLIDOS
+            if ($currentDepth -lt $maxDepth -and $validPathsThisLevel.Count -gt 0) {
+                Write-Host "`n[RECURSION] Found $($validPathsThisLevel.Count) valid paths at depth $currentDepth" -ForegroundColor Yellow
+                
+                foreach ($validWord in $validPathsThisLevel) {
+                    # Não recursa em palavras que sabemos que não devem recursar
+                    if ($noRecursionWords -contains $validWord.ToLower()) {
+                        continue
+                    }
+                    
+                    # Não recursa em arquivos com extensão
+                    if ($validWord -match '\.[a-z]{2,4}$') {
+                        continue
+                    }
+                    
+                    $nextUrl = if ($basePath.EndsWith('/')) {
+                        "$basePath$validWord"
+                    } else {
+                        "$basePath/$validWord"
+                    }
+                    
+                    Write-Host "       -> Recursing to depth $(($currentDepth + 1)) from: $validWord" -ForegroundColor Yellow
+                    Invoke-SmartRecursion -basePath $nextUrl -wordList $wordList -currentDepth ($currentDepth + 1) -maxDepth $maxDepth
+                }
+            }
         }
+
+        # INICIA FUZZING PRINCIPAL
+        Write-Host "`n[FUZZING] Starting smart recursive scan..." -ForegroundColor Magenta
+        Write-Host "          (Duplicates and generic pages are filtered silently)`n" -ForegroundColor Gray
         
+        Invoke-SmartRecursion -basePath $baseUrl -wordList $words -currentDepth 1 -maxDepth $MaxDepth
+
+        # RELATÓRIO FINAL
+        $endTime = Get-Date
+        $duration = $endTime - $startTime
+        $requestsPerSecond = [math]::Round($totalRequests / [math]::Max($duration.TotalSeconds, 1), 2)
+
+        Write-Host "`n[SCAN COMPLETE]" -ForegroundColor Green
+        Write-Host "   Total Requests: $totalRequests" -ForegroundColor White
+        Write-Host "   Valid Endpoints: $validEndpoints" -ForegroundColor Cyan
+        Write-Host "   Duplicates Filtered: $duplicatesFiltered" -ForegroundColor DarkYellow
+        Write-Host "   Duration: $([math]::Round($duration.TotalSeconds, 2))s" -ForegroundColor White
+        Write-Host "   Speed: $requestsPerSecond req/s" -ForegroundColor White
+
+        $finalResults = $allResults | Sort-Object Depth, StatusCode | Select-Object -Unique
+        
+        if ($finalResults.Count -gt 0) {
+            Write-Host "`n[VALID ENDPOINTS FOUND]:" -ForegroundColor Green
+            $finalResults | Format-Table URL, StatusCode, ContentLength, Depth, Title -AutoSize
+            
+            # Salva resultados em arquivo
+            $resultsFile = "fuzzing_results_$(Get-Date -Format 'yyyyMMdd_HHmmss').csv"
+            $finalResults | Export-Csv -Path $resultsFile -NoTypeInformation
+            Write-Host "   Results saved to: $resultsFile" -ForegroundColor Gray
+            
+            return $finalResults
+        } else {
+            Write-Host "`n[RESULTS] No real endpoints found" -ForegroundColor Yellow
+            return @()
+        }
+
     } catch {
-        Write-Host "[FUZZING] X Error during fuzzing: $($_.Exception.Message)" -ForegroundColor Red
+        Write-Host "[FATAL ERROR] $($_.Exception.Message)" -ForegroundColor Red
+        return @()
     }
+}
+# FUNÇÕES AUXILIARES PARA DETECÇÃO PRECISA
+function Get-PageSignature {
+    param([string]$Url)
+    
+    try {
+        $request = [System.Net.WebRequest]::Create($Url)
+        $request.Timeout = 10000
+        $response = $request.GetResponse()
+        $stream = $response.GetResponseStream()
+        $reader = New-Object System.IO.StreamReader($stream)
+        $content = $reader.ReadToEnd()
+        $reader.Close()
+        $response.Close()
+
+        $title = if ($content -match '<title[^>]*>(.*?)</title>') { $matches[1].Trim() } else { "No Title" }
+        $contentHash = [System.BitConverter]::ToString(
+            [System.Security.Cryptography.MD5]::Create().ComputeHash(
+                [System.Text.Encoding]::UTF8.GetBytes($content)
+            )
+        ).Replace("-", "").ToLower()
+
+        return @{
+            Url = $Url
+            Title = $title
+            ContentLength = $content.Length
+            ContentHash = $contentHash
+            SampleContent = $content.Substring(0, [math]::Min(1000, $content.Length))
+        }
+    } catch {
+        return $null
+    }
+}
+
+function Test-RealEndpoint {
+    param($Url, $Content, $ContentLength, $BaseSignature)
+    
+    # VERIFICAÇÕES CONSECUTIVAS PARA FALSOS POSITIVOS
+    
+    # 1. Comparação de Hash (mais precisa)
+    $currentHash = [System.BitConverter]::ToString(
+        [System.Security.Cryptography.MD5]::Create().ComputeHash(
+            [System.Text.Encoding]::UTF8.GetBytes($Content)
+        )
+    ).Replace("-", "").ToLower()
+
+    if ($currentHash -eq $BaseSignature.ContentHash) {
+        return $false # Conteúdo idêntico ao base
+    }
+
+    # 2. Verificação de páginas de erro
+    $errorPatterns = @(
+        "404", "Not Found", "Page Not Found", "Error", "Invalid", "Cannot GET",
+        "Route not found", "The resource cannot be found", "Object not found",
+        "404 Not Found", "404 Error", "Page Not Found"
+    )
+
+    foreach ($pattern in $errorPatterns) {
+        if ($Content -imatch $pattern) {
+            return $false
+        }
+    }
+
+    # 3. Verificação de tamanho (páginas muito pequenas geralmente são erros)
+    if ($ContentLength -lt 100 -and $BaseSignature.ContentLength -gt 1000) {
+        return $false
+    }
+
+    # 4. Verificação de conteúdo vazio/básico
+    if ($Content -match '^\s*$' -or $Content -match '^<\?xml') {
+        return $false
+    }
+
+    # 5. Verificação de redirect para página principal
+    if ($Content -match 'window\.location|http-equiv\s*=\s*["'']refresh["'']') {
+        if ($Content -match $BaseSignature.Url) {
+            return $false
+        }
+    }
+
+    # 6. Verificação de páginas de archive/listagem genérica do WordPress
+    $wpGenericPatterns = @(
+        "archive", "category", "tag", "author", "date", "search",
+        "is_404", "page-not-found", "error-404",
+        "Nothing found", "No posts found"
+    )
+
+    foreach ($pattern in $wpGenericPatterns) {
+        if ($Content -imatch $pattern -and $ContentLength -lt 1500) {
+            return $false
+        }
+    }
+
+    # Se passou por todas as verificações, é provavelmente um endpoint válido
+    return $true
 }
 # =============================================
 # FUNÇÕES DE EXECUÇÃO E MENU
@@ -2089,7 +2229,7 @@ function RunAllScans {
         Start-Sleep -Milliseconds 300
     }
     
-    Write-Host "`n`n=== CHECKING AUTO FUZZING MODE ===" -ForegroundColor Cyan
+    Write-Host "`n`n        === CHECKING AUTO FUZZING MODE ===" -ForegroundColor Cyan
     
     if ($global:AutoFuzzingMode -eq 1) {
         Write-Host "Auto Fuzzing Mode: ENABLED" -ForegroundColor Green
