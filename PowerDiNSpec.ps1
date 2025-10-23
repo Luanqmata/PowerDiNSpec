@@ -1743,7 +1743,6 @@ function ScanHTML {
         }
     }
 }
-
 function Start-FuzzingRecursive {
     param(
         [string]$url,
@@ -1805,9 +1804,10 @@ function Start-FuzzingRecursive {
         $allResults = [System.Collections.ArrayList]::new()
         $visitedUrls = @{}  # Hash table para URLs já visitadas
         $contentHashes = @{} # Hash table para conteúdos já vistos
-        $totalRequests = 0
-        $validEndpoints = 0
-        $duplicatesFiltered = 0
+        $script:totalRequests = 0
+        $script:validEndpoints = 0
+        $script:duplicatesFiltered = 0
+        $script:lastDuplicateUrl = "None"
         $startTime = Get-Date
 
         # FUNÇÃO DE TESTE OTIMIZADA
@@ -1817,6 +1817,7 @@ function Start-FuzzingRecursive {
             # Verifica se URL já foi visitada
             if ($visitedUrls.ContainsKey($testUrl)) {
                 $script:duplicatesFiltered++
+                $script:lastDuplicateUrl = $testUrl
                 return $false
             }
             $visitedUrls[$testUrl] = $true
@@ -1854,6 +1855,7 @@ function Start-FuzzingRecursive {
                 # Verifica se já vimos este conteúdo antes (SILENCIOSAMENTE)
                 if ($contentHashes.ContainsKey($contentHash)) {
                     $script:duplicatesFiltered++
+                    $script:lastDuplicateUrl = $testUrl
                     return $false
                 }
                 $contentHashes[$contentHash] = $true
@@ -1883,7 +1885,10 @@ function Start-FuzzingRecursive {
                     
                     Write-Host "[REAL $statusCode] Depth $currentDepth - $testUrl" -ForegroundColor Green
                     if ($title) {
-                        Write-Host "       Title: $title" -ForegroundColor Cyan
+                        Write-Host "       Title: $title" -ForegroundColor Magenta
+                    }
+                    if ($contentLength -gt 0) {
+                        Write-Host "            Size: $contentLength bytes" -ForegroundColor Gray
                     }
                     
                     return $true
@@ -1891,6 +1896,9 @@ function Start-FuzzingRecursive {
                     # Mostra apenas FALSE quando for realmente diferente (não duplicado)
                     if (-not $contentHashes.ContainsKey($contentHash)) {
                         Write-Host "[FALSE $statusCode] $testUrl" -ForegroundColor Gray
+                        if ($contentLength -gt 0) {
+                            Write-Host "       Size: $contentLength bytes" -ForegroundColor DarkGray
+                        }
                     }
                     return $false
                 }
@@ -1930,14 +1938,26 @@ function Start-FuzzingRecursive {
                 }
                 
                 # PALAVRAS QUE NUNCA DEVEM RECURSAR
-                $noRecursionWords = @('css', 'js', 'img', 'images', 'assets', 'static', 'media', 'fonts', 'wp-content', 'wp-includes')
+                $noRecursionWords = @('non9')
                 $isNoRecursion = $noRecursionWords -contains $word.ToLower()
                 
-                # PROGRESSO (mostra a cada 25 requests para não poluir)
+                # PROGRESSO DETALHADO - MOSTRA TUDO EM TEMPO REAL
                 $testedCount++
-                if ($testedCount % 25 -eq 0) {
-                    Write-Progress -Activity "Depth $currentDepth" -Status "Tested: $testedCount/$($wordList.Count)" -PercentComplete ([math]::Round(($testedCount / $wordList.Count) * 100, 1))
-                }
+                $percentComplete = [math]::Round(($testedCount / $wordList.Count) * 100, 1)
+                $elapsedTime = (Get-Date) - $startTime
+                $elapsedFormatted = "{0:D2}:{1:D2}" -f $elapsedTime.Minutes, $elapsedTime.Seconds
+                
+                # BARRA DE PROGRESSO COMPLETA
+                Write-Progress -Id 1 -Activity "RECURSIVE FUZZING - Depth $currentDepth" -Status "Directory: $basePath" -PercentComplete $percentComplete -CurrentOperation "Testing: $word"
+                
+                Write-Progress -Id 2 -Activity "STATISTICS" -Status "Progress: $testedCount/$($wordList.Count) words | $percentComplete% Complete | Valid: $($script:validEndpoints) endpoints" -ParentId 1
+                
+                Write-Progress -Id 3 -Activity "TIMING" -Status "Elapsed: $elapsedFormatted | Speed: $([math]::Round($script:totalRequests / [math]::Max($elapsedTime.TotalSeconds, 1), 2)) req/s" -ParentId 1
+                
+                Write-Progress -Id 4 -Activity "REQUESTS" -Status "Total: $($script:totalRequests) requests | Filtered: $($script:duplicatesFiltered) duplicates" -ParentId 1
+                
+                # NOVA BARRA: ÚLTIMO DUPLICADO FILTRADO
+                Write-Progress -Id 5 -Activity "LAST DUPLICATE FILTERED" -Status "$($script:lastDuplicateUrl)" -ParentId 1
                 
                 # TESTE DO ENDPOINT
                 $isValid = Test-Endpoint -testUrl $testUrl -currentDepth $currentDepth -parentWord $word
@@ -1950,7 +1970,12 @@ function Start-FuzzingRecursive {
                 Start-Sleep -Milliseconds (Get-Random -Minimum 50 -Maximum 150)
             }
             
-            Write-Progress -Activity "Depth $currentDepth" -Completed
+            # LIMPA AS BARRAS DE PROGRESSO
+            Write-Progress -Id 1 -Activity "Completed" -Completed
+            Write-Progress -Id 2 -Activity "Completed" -Completed
+            Write-Progress -Id 3 -Activity "Completed" -Completed
+            Write-Progress -Id 4 -Activity "Completed" -Completed
+            Write-Progress -Id 5 -Activity "Completed" -Completed
             
             # RECURSÃO APENAS PARA PATHS VÁLIDOS
             if ($currentDepth -lt $maxDepth -and $validPathsThisLevel.Count -gt 0) {
@@ -1959,11 +1984,13 @@ function Start-FuzzingRecursive {
                 foreach ($validWord in $validPathsThisLevel) {
                     # Não recursa em palavras que sabemos que não devem recursar
                     if ($noRecursionWords -contains $validWord.ToLower()) {
+                        Write-Host "       [SKIP] No recursion for: $validWord" -ForegroundColor DarkGray
                         continue
                     }
                     
                     # Não recursa em arquivos com extensão
                     if ($validWord -match '\.[a-z]{2,4}$') {
+                        Write-Host "       [SKIP] File extension, no recursion: $validWord" -ForegroundColor DarkGray
                         continue
                     }
                     
@@ -1988,12 +2015,12 @@ function Start-FuzzingRecursive {
         # RELATÓRIO FINAL
         $endTime = Get-Date
         $duration = $endTime - $startTime
-        $requestsPerSecond = [math]::Round($totalRequests / [math]::Max($duration.TotalSeconds, 1), 2)
+        $requestsPerSecond = [math]::Round($script:totalRequests / [math]::Max($duration.TotalSeconds, 1), 2)
 
         Write-Host "`n[SCAN COMPLETE]" -ForegroundColor Green
-        Write-Host "   Total Requests: $totalRequests" -ForegroundColor White
-        Write-Host "   Valid Endpoints: $validEndpoints" -ForegroundColor Cyan
-        Write-Host "   Duplicates Filtered: $duplicatesFiltered" -ForegroundColor DarkYellow
+        Write-Host "   Total Requests: $($script:totalRequests)" -ForegroundColor White
+        Write-Host "   Valid Endpoints: $($script:validEndpoints)" -ForegroundColor Cyan
+        Write-Host "   Duplicates Filtered: $($script:duplicatesFiltered)" -ForegroundColor DarkYellow
         Write-Host "   Duration: $([math]::Round($duration.TotalSeconds, 2))s" -ForegroundColor White
         Write-Host "   Speed: $requestsPerSecond req/s" -ForegroundColor White
 
@@ -2204,8 +2231,8 @@ function RunAllScans {
                 $scanHTMLExecuted = $true
                 
                 if ($fuzzingResult -and $fuzzingResult.SavedFilePath) {
-                    Write-Host "Wordlist available at: $($fuzzingResult.SavedFilePath)" -ForegroundColor Green
-                    Write-Host "Total words extracted: $($fuzzingResult.TotalWords)" -ForegroundColor White
+                    # Write-Host "`nWordlist available at: $($fuzzingResult.SavedFilePath)" -ForegroundColor Green
+                    # Write-Host "Total words extracted: $($fuzzingResult.TotalWords)" -ForegroundColor White
                     Write-Log "Words for Fuzzing completed. Total words: $($fuzzingResult.TotalWords), File: $($fuzzingResult.SavedFilePath)" "INFO"
                 } else {
                     Write-Host "Wordlist NOT saved but Auto Fuzzing will use temporary file if needed" -ForegroundColor Yellow
@@ -2229,7 +2256,7 @@ function RunAllScans {
         Start-Sleep -Milliseconds 300
     }
     
-    Write-Host "`n`n        === CHECKING AUTO FUZZING MODE ===" -ForegroundColor Cyan
+    Write-Host "`n`n        === CHECKING AUTO FUZZING MODE ===`n" -ForegroundColor Magenta
     
     if ($global:AutoFuzzingMode -eq 1) {
         Write-Host "Auto Fuzzing Mode: ENABLED" -ForegroundColor Green
@@ -2256,7 +2283,7 @@ function RunAllScans {
                 Write-Host "Temporary wordlist created: $tempWordlist" -ForegroundColor Green
             }
 
-            Write-Host "`n      === STARTING AUTO FUZZING ===" -ForegroundColor Magenta
+            Write-Host "`n           === STARTING AUTO FUZZING ===`n" -ForegroundColor Magenta
             Write-Host "Launching recursive fuzzing with generated wordlist..." -ForegroundColor Cyan
             
             Start-Sleep -Seconds 2
@@ -2560,7 +2587,7 @@ function PowerDiNSpec {
                         "Help",
                         "Configure: Cap'port Banner - Option [13]",
                         "Configure: RunAllScans - Option [15]",
-                        "Disable: Auto Fuzzing Mode - Option [16]"
+                        "Disable : Auto Fuzzing Mode - Option [16]"
                     )
 
                     for ($i = 0; $i -lt $submenu.Count; $i++) {
@@ -2571,11 +2598,11 @@ function PowerDiNSpec {
                     
                     if ($i -eq 4) {
                         if ($global:AutoFuzzingMode -eq 1) {
-                            Write-Host -NoNewline "Enable" -ForegroundColor Green
-                            Write-Host ": Auto Fuzzing Mode - Option [16]" -ForegroundColor Magenta
+                            Write-Host -NoNewline "( Enable )" -ForegroundColor Green
+                            Write-Host " Auto Fuzzing Mode - Option [16]" -ForegroundColor Magenta
                         } else {
-                            Write-Host -NoNewline "Disable" -ForegroundColor Red
-                            Write-Host ": Auto Fuzzing Mode - Option [16]" -ForegroundColor Magenta
+                            Write-Host -NoNewline "( Disable )" -ForegroundColor Red
+                            Write-Host " Auto Fuzzing Mode - Option [16]" -ForegroundColor Magenta
                         }
                     } else {
                         Write-Host "$($submenu[$i])" -ForegroundColor Yellow
