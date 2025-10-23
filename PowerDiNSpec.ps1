@@ -1747,7 +1747,7 @@ function Start-FuzzingRecursive {
     param(
         [string]$url,
         [string]$wordlist,
-        [int]$MaxDepth = 2,
+        [int]$MaxDepth = 4,
         [int]$TimeoutMs = 3000,
         [switch]$Aggressive = $false,
         [int]$MaxThreads = 5
