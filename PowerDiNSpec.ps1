@@ -1784,8 +1784,10 @@ function Start-FuzzingRecursive {
         
         Write-Host "`n[CONFIG]" -ForegroundColor Cyan
         Write-Host "  Words: $($words.Count)" -ForegroundColor Gray
-        Write-Host "  Max Depth: $MaxDepth" -ForegroundColor Gray
+        Write-Host "  Max Depth: $MaxDepth  ( Line:1750 )" -ForegroundColor Gray
         Write-Host "  Timeout: ${TimeoutMs}ms" -ForegroundColor Gray
+        Write-Host "  Aggressive Mode: $Aggressive ( Line:1752 )" -ForegroundColor Gray
+        Write-Host "  Max Threads: $MaxThreads ( Line:1753 )" -ForegroundColor Gray
 
         # SISTEMA AVANÇADO DE DETECÇÃO DE BASE
         Write-Host "`n[ANALYSIS] Analyzing base page..." -ForegroundColor Cyan
@@ -2262,8 +2264,8 @@ function RunAllScans {
         Write-Host "Auto Fuzzing Mode: ENABLED" -ForegroundColor Green
         
         if ($scanHTMLExecuted -and $fuzzingResult -and $fuzzingResult.TotalWords -gt 0) {
-            Write-Host "Words for Fuzzing: EXECUTED" -ForegroundColor Green
-            Write-Host "Total words: $($fuzzingResult.TotalWords)" -ForegroundColor White
+            Write-Host "Words for Fuzzing: EXECUTED`n" -ForegroundColor Green
+            #Write-Host "Total words: $($fuzzingResult.TotalWords)" -ForegroundColor White
 
             if ($fuzzingResult.SavedFilePath -and (Test-Path $fuzzingResult.SavedFilePath)) {
                 Write-Host "Wordlist file: FOUND ($($fuzzingResult.SavedFilePath))" -ForegroundColor Green
@@ -2283,8 +2285,8 @@ function RunAllScans {
                 Write-Host "Temporary wordlist created: $tempWordlist" -ForegroundColor Green
             }
 
-            Write-Host "`n           === STARTING AUTO FUZZING ===`n" -ForegroundColor Magenta
-            Write-Host "Launching recursive fuzzing with generated wordlist..." -ForegroundColor Cyan
+            Write-Host "`n          === STARTING AUTO FUZZING ===`n" -ForegroundColor Magenta
+            Write-Host "Launching recursive fuzzing with generated wordlist..." -ForegroundColor Yellow
             
             Start-Sleep -Seconds 2
             
@@ -2586,8 +2588,8 @@ function PowerDiNSpec {
                         "Back Menu",
                         "Help",
                         "Configure: Cap'port Banner - Option [13]",
-                        "Configure: RunAllScans - Option [15]",
-                        "Disable : Auto Fuzzing Mode - Option [16]"
+                        "Disable : Auto Fuzzing Mode - Option [15]",
+                        "Configure: RunAllScans - Option [16]"
                     )
 
                     for ($i = 0; $i -lt $submenu.Count; $i++) {
@@ -2667,8 +2669,7 @@ function PowerDiNSpec {
                             $null = Read-Host
                             continue
                         }
-                    } # ← Fecha o switch principal do submenu
-                    
+                    }
                     if ($choice -eq 0) { break }
                 }
             }
@@ -2864,7 +2865,7 @@ function PowerDiNSpec {
                     $resultadoScan = ScanHTML -url $url
                     
                     if ($resultadoScan.SavedFilePath -and (Test-Path $resultadoScan.SavedFilePath)) {
-                        Write-Host "`nStarting recursive fuzzing automatically..." -ForegroundColor Cyan
+                        Write-Host "`nStarting recursive fuzzing automatically..." -ForegroundColor Yellow
                         Start-Sleep -Seconds 2
                         Start-FuzzingRecursive -url $url -wordlist $resultadoScan.SavedFilePath
                     } else {
