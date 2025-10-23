@@ -2378,7 +2378,7 @@ function Help {
     Write-Host "`n    [14] Wordlist Generation for Fuzzing" -ForegroundColor Green
     Write-Host "        Extracts unique words from HTML content to create customized wordlists" -ForegroundColor White
     Write-Host "        for directory brute-forcing, fuzzing, and content discovery." -ForegroundColor Gray
-    Write-Host "`n    [15] Fuzzing Recursivo Infinito" -ForegroundColor Green
+    Write-Host "`n    [15] Fuzzing Recursive" -ForegroundColor Green
     Write-Host "        Advanced recursive directory fuzzing with features:" -ForegroundColor White
     Write-Host "        - Infinite depth recursion on found directories" -ForegroundColor Gray
     Write-Host "        - Real-time progress tracking" -ForegroundColor Gray
