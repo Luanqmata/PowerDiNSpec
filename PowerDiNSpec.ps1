@@ -1708,6 +1708,9 @@ function Configure-ScansInteractive {
         }
     }
 }
+# =============================================
+# FUNÇÕES DE CONFIGURAÇÃO DE FUZZING
+# =============================================
 function Get-StatusCodeColor {
     param([int]$StatusCode)
     
@@ -1781,6 +1784,7 @@ function Test-StatusCodeFilter {
     
     return $global:FuzzingStatusCodes -contains $StatusCode
 }
+# FUNÇÕES DE CONFIGURAÇÃO DE FUZZING
 function Configure-FuzzingRecursive {
      while ($true) {
         Clear-Host 
@@ -1844,23 +1848,23 @@ function Configure-FuzzingRecursive {
         
         Write-Host "                                                                       Press " -NoNewline -ForegroundColor DarkRed
         Write-Host "[S]" -NoNewline -ForegroundColor DarkGreen
-        Write-Host " - Success Codes Only (200, 301, 302)" -ForegroundColor Gray
+        Write-Host " - Success Codes Only         (200, 301, 302)" -ForegroundColor Gray
         
         Write-Host "                                                                       Press " -NoNewline -ForegroundColor DarkRed
         Write-Host "[G]" -NoNewline -ForegroundColor DarkGreen
-        Write-Host " - Good Codes (200, 301, 302, 403, 500, 503)" -ForegroundColor Gray
+        Write-Host " - Good Codes          (200, 301, 302, 403, 500, 503)" -ForegroundColor Gray
 
         Write-Host "                                                                       Press " -NoNewline -ForegroundColor DarkRed
         Write-Host "[E]" -NoNewline -ForegroundColor DarkGreen
-        Write-Host " - Error Codes Only (400, 403, 404, 500, 503)" -ForegroundColor Gray
+        Write-Host " - Error Codes Only      (400, 403, 404, 500, 503)" -ForegroundColor Gray
         
         Write-Host "                                                                       Press " -NoNewline -ForegroundColor DarkRed
         Write-Host "[A]" -NoNewline -ForegroundColor DarkGreen
-        Write-Host " - All (200, 301, 302, 400, 403, 404, 500, 503)" -ForegroundColor Gray
+        Write-Host " - All           (200, 301, 302, 400, 403, 404, 500, 503)" -ForegroundColor Gray
         
         Write-Host "                                                                       Press " -NoNewline -ForegroundColor DarkRed
         Write-Host "[N]" -NoNewline -ForegroundColor DarkGreen
-        Write-Host " - All Except Errors (All codes except 400, 403, 404)" -ForegroundColor Gray
+        Write-Host " - All Except Errors     (All codes except 400, 403, 404)" -ForegroundColor Gray
         
         Write-Host "                                                                       Press " -NoNewline -ForegroundColor DarkRed
         Write-Host "[C]" -NoNewline -ForegroundColor DarkGreen
@@ -2783,154 +2787,198 @@ function RunAllScans {
 function Help {
     Clear-Host
     Logo_Menu
-    Write-Host "`n                                                                          ==== HELP - PowerDiNSpec v2.2.5 ====`n" -ForegroundColor Red
+    Write-Host "`n                                                                          ==== HELP - PowerDiNSpec v2.3.0 ====`n" -ForegroundColor Red
 
-    Write-Host "`n  POWERDINSPEC - PowerShell DNS Recon Tool" -ForegroundColor Yellow
+    Write-Host "`n  POWERDINSPEC - Advanced PowerShell Reconnaissance Toolkit" -ForegroundColor Yellow
     Write-Host "`n  PowerDiNSpec is a comprehensive PowerShell-based reconnaissance toolkit for" -ForegroundColor White
     Write-Host "  websites and DNS infrastructure. Designed for security professionals, researchers," -ForegroundColor White
     Write-Host "  and penetration testers conducting authorized security assessments." -ForegroundColor White
+    
     Write-Host "`n  OVERVIEW" -ForegroundColor Cyan
     Write-Host "    PowerDiNSpec automates multiple reconnaissance techniques against web targets," -ForegroundColor White
     Write-Host "    providing essential information gathering capabilities for security assessments." -ForegroundColor White
     Write-Host "    Each scan is designed to be non-invasive but may trigger security monitoring." -ForegroundColor White
+
     Write-Host "`n  CORE FEATURES" -ForegroundColor Cyan   
-    Write-Host "`n    [1] HTTP Status Code Analysis" -ForegroundColor Green
-    Write-Host "        Retrieves and analyzes HTTP response codes to understand server behavior" -ForegroundColor White
-    Write-Host "        and identify potential issues or redirect patterns." -ForegroundColor Gray
-    Write-Host "`n    [2] Page Title Extraction" -ForegroundColor Green
-    Write-Host "        Extracts and displays the HTML page title for quick content identification" -ForegroundColor White
-    Write-Host "        and target verification." -ForegroundColor Gray
-    Write-Host "`n    [3] DNS IP Resolution" -ForegroundColor Green
-    Write-Host "        Performs comprehensive DNS lookups for both IPv4 (A) and IPv6 (AAAA)" -ForegroundColor White
-    Write-Host "        records, revealing the target's IP infrastructure." -ForegroundColor Gray
-    Write-Host "`n    [4] HTTP Methods Discovery" -ForegroundColor Green
-    Write-Host "        Enumerates allowed HTTP methods (GET, POST, PUT, DELETE, OPTIONS, etc.)" -ForegroundColor White
-    Write-Host "        to identify potential attack vectors and server configuration." -ForegroundColor Gray
-    Write-Host "`n    [5] Server Headers Analysis" -ForegroundColor Green
+    
+    Write-Host "`n    WEB RECONNAISSANCE" -ForegroundColor Magenta
+    Write-Host "    [1] HTTP Status Code Analysis" -ForegroundColor Green
+    Write-Host "        Retrieves and analyzes HTTP response codes with color-coded categorization" -ForegroundColor White
+    Write-Host "        and identifies redirect patterns, client/server errors." -ForegroundColor Gray
+    
+    Write-Host "    [2] Page Title Extraction" -ForegroundColor Green
+    Write-Host "        Extracts and analyzes HTML page titles with length analysis for quick" -ForegroundColor White
+    Write-Host "        content identification and target verification." -ForegroundColor Gray
+    
+    Write-Host "    [4] HTTP Methods Discovery" -ForegroundColor Green
+    Write-Host "        Enumerates allowed HTTP methods (GET, POST, PUT, DELETE, OPTIONS) with" -ForegroundColor White
+    Write-Host "        risk assessment for dangerous methods like PUT and DELETE." -ForegroundColor Gray
+    
+    Write-Host "    [5] Server Headers Analysis" -ForegroundColor Green
     Write-Host "        Captures and analyzes HTTP response headers including Server, X-Powered-By," -ForegroundColor White
-    Write-Host "        and other security-related headers for technology fingerprinting." -ForegroundColor Gray
-    Write-Host "`n    [6] Technology Detection" -ForegroundColor Green
-    Write-Host "        Identifies web technologies, frameworks, and server software through" -ForegroundColor White
-    Write-Host "        header analysis and response patterns." -ForegroundColor Gray
-    Write-Host "`n    [7] Security Headers Analysis" -ForegroundColor Green
-    Write-Host "        Comprehensive security headers audit including:" -ForegroundColor White
+    Write-Host "        and framework-specific headers for comprehensive technology fingerprinting." -ForegroundColor Gray
+    
+    Write-Host "    [6] Technology Detection" -ForegroundColor Green
+    Write-Host "        Advanced fingerprinting of web technologies, frameworks (React, jQuery)," -ForegroundColor White
+    Write-Host "        CMS platforms (WordPress, Drupal, Joomla), and server software." -ForegroundColor Gray
+    
+    Write-Host "    [7] Security Headers Analysis" -ForegroundColor Green
+    Write-Host "        Comprehensive security headers audit with scoring system:" -ForegroundColor White
     Write-Host "        - Content-Security-Policy, Strict-Transport-Security" -ForegroundColor Gray
-    Write-Host "        - X-Frame-Options, X-Content-Type-Options" -ForegroundColor Gray
-    Write-Host "        - Security scoring and recommendations" -ForegroundColor Gray
-    Write-Host "`n    [8] DNS Zone Transfer Test" -ForegroundColor Green
-    Write-Host "        Tests DNS servers for zone transfer vulnerabilities that could" -ForegroundColor White
-    Write-Host "        expose all DNS records of the domain." -ForegroundColor Gray
-    Write-Host "`n    [9] Comprehensive DNS Records" -ForegroundColor Green
-    Write-Host "        Extensive DNS reconnaissance including:" -ForegroundColor White
-    Write-Host "        - MX Records  - Mail server information" -ForegroundColor Gray
-    Write-Host "        - NS Records  - Name servers" -ForegroundColor Gray
-    Write-Host "        - SOA Records - Zone authority information" -ForegroundColor Gray
-    Write-Host "        - CNAME Records - Canonical name mappings" -ForegroundColor Gray
-    Write-Host "        - TXT Records - SPF, DKIM, verification records" -ForegroundColor Gray
-    Write-Host "        - PTR Records - Reverse DNS lookups" -ForegroundColor Gray
-    Write-Host "`n    [10] HTML Link Discovery" -ForegroundColor Green
+    Write-Host "        - X-Frame-Options, X-Content-Type-Options, Referrer-Policy" -ForegroundColor Gray
+    Write-Host "        - Security scoring and vulnerability identification" -ForegroundColor Gray
+    
+    Write-Host "    [10] HTML Link Discovery" -ForegroundColor Green
     Write-Host "        Extracts all HTTP/HTTPS links from page content to map internal and" -ForegroundColor White
-    Write-Host "        external resources and identify potential attack surface." -ForegroundColor Gray
-    Write-Host "`n    [11] Robots.txt Analysis" -ForegroundColor Green
-    Write-Host "        Retrieves and analyzes robots.txt files to discover hidden directories," -ForegroundColor White
-    Write-Host "        disallowed paths, and potential sensitive areas." -ForegroundColor Gray
-    Write-Host "`n    [12] Sitemap Discovery" -ForegroundColor Green
-    Write-Host "        Checks for sitemap.xml files to understand site structure and" -ForegroundColor White
-    Write-Host "        discover additional content paths." -ForegroundColor Gray
-    Write-Host "`n    [13] Port Banner Grabbing" -ForegroundColor Green
-    Write-Host "        Advanced service detection on multiple ports with configurable presets:" -ForegroundColor White
-    Write-Host "        - Common Services (21,22,80,443, etc.)" -ForegroundColor Gray
-    Write-Host "        - Web Services (80,443,8080,8443, etc.)" -ForegroundColor Gray
-    Write-Host "        - Database Ports (1433,1521,3306,5432, etc.)" -ForegroundColor Gray
-    Write-Host "        - Email Services (25,110,143,465, etc.)" -ForegroundColor Gray
-    Write-Host "        - Custom port ranges supported" -ForegroundColor Gray
-    Write-Host "`n    [14] Wordlist Generation for Fuzzing" -ForegroundColor Green
-    Write-Host "        Extracts unique words from HTML content to create customized wordlists" -ForegroundColor White
-    Write-Host "        for directory brute-forcing, fuzzing, and content discovery." -ForegroundColor Gray
-    Write-Host "`n    [15] Fuzzing Recursive" -ForegroundColor Green
-    Write-Host "        Advanced recursive directory fuzzing with features:" -ForegroundColor White
-    Write-Host "        - Infinite depth recursion on found directories" -ForegroundColor Gray
-    Write-Host "        - Real-time progress tracking" -ForegroundColor Gray
-    Write-Host "        - Automatic port discovery from HTML content" -ForegroundColor Gray
-    Write-Host "        - Multi-level directory discovery" -ForegroundColor Gray
-    Write-Host "`n    [16] Run All Scans" -ForegroundColor Green
-    Write-Host "        Executes a comprehensive sequential assessment using all enabled scans" -ForegroundColor White
-    Write-Host "        with configurable options and real-time progress display." -ForegroundColor Gray
+    Write-Host "        external resources, identifying potential attack surface expansion." -ForegroundColor Gray
+    
+    Write-Host "    [11] Robots.txt Analysis" -ForegroundColor Green
+    Write-Host "        Comprehensive robots.txt analysis with sensitive path detection," -ForegroundColor White
+    Write-Host "        user-agent targeting, and disallowed directory identification." -ForegroundColor Gray
+    
+    Write-Host "    [12] Sitemap Discovery" -ForegroundColor Green
+    Write-Host "        XML sitemap analysis with URL categorization (images, PDFs, admin," -ForegroundColor White
+    Write-Host "        API endpoints) and interesting path identification." -ForegroundColor Gray
 
-    Write-Host "`n  NEW FEATURES IN v2.2.5" -ForegroundColor Magenta
-    Write-Host "    - Auto Fuzzing Mode: Automatic recursive fuzzing after word extraction" -ForegroundColor White
-    Write-Host "    - Port Discovery: Automatically detects and tests ports from HTML content" -ForegroundColor White
-    Write-Host "    - Enhanced Wordlist Generation: Improved filtering and optimization" -ForegroundColor White
-    Write-Host "    - Recursive Fuzzing: Infinite depth directory discovery" -ForegroundColor White
-    Write-Host "    - Real-time Progress: Visual progress bars for long-running scans" -ForegroundColor White
-    Write-Host "    - Auto-save Functionality: Automatic wordlist saving for fuzzing" -ForegroundColor White
+    Write-Host "`n    DNS & NETWORK RECONNAISSANCE" -ForegroundColor Magenta
+    Write-Host "    [3] DNS IP Resolution" -ForegroundColor Green
+    Write-Host "        Performs comprehensive DNS lookups for both IPv4 (A) and IPv6 (AAAA)" -ForegroundColor White
+    Write-Host "        records, revealing the target's complete IP infrastructure." -ForegroundColor Gray
+    
+    Write-Host "    [8] DNS Zone Transfer Test" -ForegroundColor Green
+    Write-Host "        Tests DNS servers for zone transfer vulnerabilities that could" -ForegroundColor White
+    Write-Host "        expose all DNS records of the domain in misconfigured environments." -ForegroundColor Gray
+    
+    Write-Host "    [9] Comprehensive DNS Records" -ForegroundColor Green
+    Write-Host "        Extensive DNS reconnaissance including all record types:" -ForegroundColor White
+    Write-Host "        - MX Records  - Mail server infrastructure" -ForegroundColor Gray
+    Write-Host "        - NS Records  - Name server architecture" -ForegroundColor Gray
+    Write-Host "        - SOA Records - Zone authority and administrative info" -ForegroundColor Gray
+    Write-Host "        - CNAME Records - Canonical name mappings and aliases" -ForegroundColor Gray
+    Write-Host "        - TXT Records - SPF, DKIM, DMARC, verification records" -ForegroundColor Gray
+    Write-Host "        - PTR Records - Reverse DNS lookups for discovered IPs" -ForegroundColor Gray
+    
+    Write-Host "    [13] Port Banner Grabbing" -ForegroundColor Green
+    Write-Host "        Advanced service detection on multiple ports with intelligent presets:" -ForegroundColor White
+    Write-Host "        - Common Services: 21,22,80,443,3306,3389,5432,8080" -ForegroundColor Gray
+    Write-Host "        - Web Services: 80,443,8080,8443,8888,9090" -ForegroundColor Gray
+    Write-Host "        - Database Ports: 1433,1521,3306,5432,27017,6379" -ForegroundColor Gray
+    Write-Host "        - Email Services: 25,110,143,465,587,993,995" -ForegroundColor Gray
+    Write-Host "        - Custom port ranges and full 1-65535 scanning supported" -ForegroundColor Gray
 
-    Write-Host "`n  AUTO FUZZING MODE" -ForegroundColor Cyan
-    Write-Host "    When enabled, automatically launches recursive fuzzing after word extraction:" -ForegroundColor White
-    Write-Host "    - Extracts words from HTML content" -ForegroundColor Gray
-    Write-Host "    - Automatically saves wordlist (even if user declines)" -ForegroundColor Gray
-    Write-Host "    - Launches recursive fuzzing with discovered words" -ForegroundColor Gray
-    Write-Host "    - Tests discovered ports automatically" -ForegroundColor Gray
-    Write-Host "    - Provides real-time progress and results" -ForegroundColor Gray
+    Write-Host "`n    ADVANCED FUZZING & DISCOVERY" -ForegroundColor Magenta
+    Write-Host "    [14] Wordlist Generation for Fuzzing" -ForegroundColor Green
+    Write-Host "        Extracts unique words from HTML content to create customized, target-specific" -ForegroundColor White
+    Write-Host "        wordlists for directory brute-forcing and content discovery." -ForegroundColor Gray
+    
+    Write-Host "    [15] Recursive Directory Fuzzing" -ForegroundColor Green
+    Write-Host "        Advanced recursive directory discovery with intelligent features:" -ForegroundColor White
+    Write-Host "        - Configurable depth levels (1-10)" -ForegroundColor Gray
+    Write-Host "        - Hash-based duplicate content filtering" -ForegroundColor Gray
+    Write-Host "        - Real-time progress tracking and statistics" -ForegroundColor Gray
+    Write-Host "        - Smart false-positive detection" -ForegroundColor Gray
+    Write-Host "        - Status code filtering and customization" -ForegroundColor Gray
+    
+    Write-Host "    [16] Run All Scans" -ForegroundColor Green
+    Write-Host "        Executes comprehensive sequential assessment using configured scans" -ForegroundColor White
+    Write-Host "        with real-time progress display and automated fuzzing pipeline." -ForegroundColor Gray
 
-    Write-Host "`n  PORT DISCOVERY INTELLIGENCE" -ForegroundColor Cyan
-    Write-Host "    Advanced port detection from HTML content:" -ForegroundColor White
-    Write-Host "    - Scans HTML for potential port numbers" -ForegroundColor Gray
-    Write-Host "    - Tests common web ports automatically" -ForegroundColor Gray
-    Write-Host "    - Auto-fuzzing on discovered live ports" -ForegroundColor Gray
-    Write-Host "    - Real-time port status reporting" -ForegroundColor Gray
+    Write-Host "`n  NEW FEATURES IN v2.2.5" -ForegroundColor Cyan
+    Write-Host "    Auto Fuzzing Mode" -ForegroundColor White
+    Write-Host "        Automatic recursive fuzzing pipeline after word extraction" -ForegroundColor Gray
+    
+    Write-Host "    Enhanced Port Discovery" -ForegroundColor White
+    Write-Host "        Intelligent port detection from HTML content and auto-testing" -ForegroundColor Gray
+    
+    Write-Host "    Advanced Progress Tracking" -ForegroundColor White
+    Write-Host "        Real-time progress bars, speed metrics, and request statistics" -ForegroundColor Gray
+    
+    Write-Host "    Smart Filtering System" -ForegroundColor White
+    Write-Host "        Hash-based duplicate detection and false-positive reduction" -ForegroundColor Gray
+    
+    Write-Host "    Granular Configuration" -ForegroundColor White
+    Write-Host "        Customizable timeouts, threads, depth, and status code filters" -ForegroundColor Gray
 
-    Write-Host "`n  CONFIGURATION FEATURES" -ForegroundColor Cyan
-    Write-Host "    - Customizable scan selection and prioritization" -ForegroundColor White
-    Write-Host "    - Configurable port ranges for banner grabbing" -ForegroundColor White
-    Write-Host "    - Preset configurations for different assessment types" -ForegroundColor White
-    Write-Host "    - Interactive configuration menus" -ForegroundColor White
-    Write-Host "    - Auto Fuzzing Mode toggle" -ForegroundColor White
-    Write-Host "    - Real-time configuration preview" -ForegroundColor White
+    Write-Host "`n  CONFIGURATION PRESETS" -ForegroundColor Cyan
+    Write-Host "    Quick setup with optimized scan profiles for different scenarios:" -ForegroundColor White
+    
+    Write-Host "    Basic Recon" -ForegroundColor Green
+    Write-Host "        Essential information gathering (Status, Title, IP, Headers, Technologies)" -ForegroundColor Gray
+    
+    Write-Host "    Web Application" -ForegroundColor Blue
+    Write-Host "        Focus on web app security (Status, Methods, Headers, Links, Technologies)" -ForegroundColor Gray
+    
+    Write-Host "    Network & DNS" -ForegroundColor Yellow
+    Write-Host "        Infrastructure reconnaissance (IP, Zone Transfer, DNS Records, Ports)" -ForegroundColor Gray
+    
+    Write-Host "    Content Discovery" -ForegroundColor Magenta
+    Write-Host "        Directory and file enumeration (Links, Robots, Sitemap, Words)" -ForegroundColor Gray
+    
+    Write-Host "    Security Audit" -ForegroundColor Red
+    Write-Host "        Comprehensive security checks (Headers, Methods, Security, Zone Transfer)" -ForegroundColor Gray
+    
+    Write-Host "    Stealth Mode" -ForegroundColor DarkGray
+    Write-Host "        Minimal detection, maximum information gathering" -ForegroundColor Gray
+    
+    Write-Host "    Penetration Test" -ForegroundColor Cyan
+    Write-Host "        Full aggressive assessment with all scans enabled" -ForegroundColor Gray
 
-    Write-Host "`n  PRESET CONFIGURATIONS" -ForegroundColor Cyan
-    Write-Host "    Quick setup with optimized scan profiles:" -ForegroundColor White
-    Write-Host "    - Basic Recon: Essential information gathering" -ForegroundColor Gray
-    Write-Host "    - Web Application: Focus on web app security" -ForegroundColor Gray
-    Write-Host "    - Network & DNS: Infrastructure reconnaissance" -ForegroundColor Gray
-    Write-Host "    - Content Discovery: Directory and file enumeration" -ForegroundColor Gray
-    Write-Host "    - Security Audit: Comprehensive security checks" -ForegroundColor Gray
-    Write-Host "    - Stealth Mode: Minimal detection, maximum info" -ForegroundColor Gray
-    Write-Host "    - Penetration Test: Full aggressive assessment" -ForegroundColor Gray
-
-    Write-Host "`n  OUTPUT & LOGGING" -ForegroundColor Cyan
-    Write-Host "    - Structured console output with color coding" -ForegroundColor White
-    Write-Host "    - Comprehensive log files with timestamps" -ForegroundColor White
-    Write-Host "    - Automatic directory organization:" -ForegroundColor White
-    Write-Host "      - Logs_PowerDns/ - Scan logs and activity records" -ForegroundColor Gray
-    Write-Host "      - Fuzz_files/    - Generated wordlists for fuzzing" -ForegroundColor Gray
-    Write-Host "    - Real-time progress indicators" -ForegroundColor White
-    Write-Host "    - Detailed scan summaries and statistics" -ForegroundColor White
+    Write-Host "`n  OUTPUT & LOGGING SYSTEM" -ForegroundColor Cyan
+    Write-Host "    Structured output with comprehensive logging capabilities:" -ForegroundColor White
+    
+    Write-Host "    Console Output" -ForegroundColor White
+    Write-Host "        - Color-coded results based on status codes and severity" -ForegroundColor Gray
+    Write-Host "        - Real-time progress indicators and statistics" -ForegroundColor Gray
+    Write-Host "        - Formatted tables and hierarchical information display" -ForegroundColor Gray
+    
+    Write-Host "    File System Organization" -ForegroundColor White
+    Write-Host "        - Logs_PowerDns/ - Timestamped scan logs and activity records" -ForegroundColor Gray
+    Write-Host "        - Fuzz_files/ - Generated wordlists for fuzzing operations" -ForegroundColor Gray
+    Write-Host "        - CSV exports - Fuzzing results and discovered endpoints" -ForegroundColor Gray
+    
+    Write-Host "    Analytics & Metrics" -ForegroundColor White
+    Write-Host "        - Request speed and success rates" -ForegroundColor Gray
+    Write-Host "        - Duplicate filtering statistics" -ForegroundColor Gray
+    Write-Host "        - Scan duration and performance metrics" -ForegroundColor Gray
 
     Write-Host "`n  PERFORMANCE OPTIMIZATIONS" -ForegroundColor Cyan
-    Write-Host "    - Parallel request processing" -ForegroundColor White
-    Write-Host "    - Configurable timeouts and delays" -ForegroundColor White
-    Write-Host "    - Intelligent wordlist optimization" -ForegroundColor White
-    Write-Host "    - Memory-efficient processing" -ForegroundColor White
-    Write-Host "    - Progressive result display" -ForegroundColor White
+    Write-Host "    Engineered for efficiency and speed in large-scale assessments:" -ForegroundColor White
+    
+    Write-Host "    Parallel Processing" -ForegroundColor White
+    Write-Host "        Configurable multi-threading for faster scanning" -ForegroundColor Gray
+    
+    Write-Host "    Intelligent Caching" -ForegroundColor White
+    Write-Host "        Hash-based content deduplication and visited URL tracking" -ForegroundColor Gray
+    
+    Write-Host "    Adaptive Timeouts" -ForegroundColor White
+    Write-Host "        Configurable timeouts and delays for different network conditions" -ForegroundColor Gray
+    
+    Write-Host "    Memory Management" -ForegroundColor White
+    Write-Host "        Efficient processing of large wordlists and result sets" -ForegroundColor Gray
+    
+    Write-Host "    Progressive Display" -ForegroundColor White
+    Write-Host "        Real-time results without blocking operation" -ForegroundColor Gray
 
-    Write-Host "`n  SECURITY, ETHICS AND LEGAL NOTICE" -ForegroundColor Yellow
-    Write-Host "    [IMPORTANT] USE ONLY WITH EXPLICIT AUTHORIZATION" -ForegroundColor Red
-    Write-Host "" -ForegroundColor White
-    Write-Host "    PowerDiNSpec is designed for:" -ForegroundColor White
-    Write-Host "    - Authorized penetration testing" -ForegroundColor Gray
-    Write-Host "    - Security research and education" -ForegroundColor Gray
-    Write-Host "    - Internal security assessments" -ForegroundColor Gray
-    Write-Host "    - Bug bounty programs with explicit scope" -ForegroundColor Gray
-    Write-Host "" -ForegroundColor White
-    Write-Host "    STRICTLY PROHIBITED:" -ForegroundColor Red
-    Write-Host "    - Scanning systems without explicit written permission" -ForegroundColor Gray
-    Write-Host "    - Testing outside of authorized scope" -ForegroundColor Gray
-    Write-Host "    - Malicious or unauthorized activities" -ForegroundColor Gray
-    Write-Host "    - Network disruption or denial of service" -ForegroundColor Gray
-    Write-Host "" -ForegroundColor White
+    Write-Host "`n  SECURITY, ETHICS AND LEGAL NOTICE" -ForegroundColor Red
+    Write-Host "    [CRITICAL] USE ONLY WITH EXPLICIT AUTHORIZATION" -ForegroundColor Yellow
+    Write-Host "`n    PowerDiNSpec is designed for legitimate security purposes:" -ForegroundColor White
+    Write-Host "    Authorized penetration testing with written permission" -ForegroundColor Green
+    Write-Host "    Security research in controlled lab environments" -ForegroundColor Green
+    Write-Host "    Educational purposes and cybersecurity training" -ForegroundColor Green
+    Write-Host "    Bug bounty programs within explicitly defined scope" -ForegroundColor Green
+    Write-Host "    Internal security assessments on owned infrastructure" -ForegroundColor Green
+
+    Write-Host "`n    STRICTLY PROHIBITED ACTIVITIES:" -ForegroundColor Red
+    Write-Host "    Scanning systems without explicit written permission" -ForegroundColor Gray
+    Write-Host "    Testing outside of authorized scope boundaries" -ForegroundColor Gray
+    Write-Host "    Malicious or unauthorized intrusion attempts" -ForegroundColor Gray
+    Write-Host "    Network disruption or denial of service attacks" -ForegroundColor Gray
+    Write-Host "    Privacy violations or unauthorized data access" -ForegroundColor Gray
+
+    Write-Host "`n    LEGAL RESPONSIBILITY:" -ForegroundColor Yellow
     Write-Host "    You are solely responsible for ensuring proper authorization and" -ForegroundColor White
-    Write-Host "    compliance with all applicable laws and regulations." -ForegroundColor White
+    Write-Host "    compliance with all applicable laws, regulations, and organizational" -ForegroundColor White
+    Write-Host "    policies. Unauthorized use may result in legal consequences." -ForegroundColor White
 
     Write-Host "`n  INSTALLATION & USAGE" -ForegroundColor Cyan
     Write-Host "    Requirements:" -ForegroundColor White
@@ -2938,22 +2986,25 @@ function Help {
     Write-Host "    - Internet connectivity for target access" -ForegroundColor Gray
     Write-Host "    - Appropriate execution policy settings" -ForegroundColor Gray
     Write-Host "    - Administrative privileges for some scans" -ForegroundColor Gray
-    Write-Host "" -ForegroundColor White
-    Write-Host "    Quick Start:" -ForegroundColor White
+    
+    Write-Host "`n    Quick Start:" -ForegroundColor White
     Write-Host "    1. Configure scans (Option 0 -> Configure Scans)" -ForegroundColor Gray
     Write-Host "    2. Set port ranges (Option 0 -> Configure Ports)" -ForegroundColor Gray
     Write-Host "    3. Enable Auto Fuzzing if desired (Option 0 -> Auto Fuzzing)" -ForegroundColor Gray
-    Write-Host "    4. Run individual scans or complete assessment" -ForegroundColor Gray
-    Write-Host "    5. Review logs in Logs_PowerDns/ directory" -ForegroundColor Gray
-    Write-Host "    6. Check Fuzz_files/ for generated wordlists" -ForegroundColor Gray
+    Write-Host "    4. Configure fuzzing parameters (Option 0 -> Fuzzing Recursive)" -ForegroundColor Gray
+    Write-Host "    5. Run individual scans or complete assessment" -ForegroundColor Gray
+    Write-Host "    6. Review logs in Logs_PowerDns/ directory" -ForegroundColor Gray
+    Write-Host "    7. Check Fuzz_files/ for generated wordlists" -ForegroundColor Gray
 
     Write-Host "`n  TIPS & BEST PRACTICES" -ForegroundColor Cyan
     Write-Host "    - Start with Basic Recon preset for initial assessment" -ForegroundColor White
     Write-Host "    - Use Stealth Mode for sensitive environments" -ForegroundColor White
     Write-Host "    - Enable Auto Fuzzing for comprehensive directory discovery" -ForegroundColor White
     Write-Host "    - Monitor scan progress and adjust timeouts as needed" -ForegroundColor White
-    Write-Host "    - Review logs for detailed scan information" -ForegroundColor White
+    Write-Host "    - Review logs for detailed scan information and troubleshooting" -ForegroundColor White
     Write-Host "    - Customize port ranges based on target environment" -ForegroundColor White
+    Write-Host "    - Use status code filtering to reduce noise in fuzzing results" -ForegroundColor White
+    Write-Host "    - Configure appropriate thread counts for your network bandwidth" -ForegroundColor White
 
     Write-Host "`n  CREDITS" -ForegroundColor Cyan
     Write-Host "    - Author: Luan Calazans (2025)" -ForegroundColor White
@@ -2973,7 +3024,7 @@ function Help {
     Write-Host "    Documentation: Included in help system and repository wiki" -ForegroundColor Gray
 
     Write-Host "`n  VERSION INFORMATION" -ForegroundColor Cyan
-    Write-Host "    Current Version: 2.2.0" -ForegroundColor White
+    Write-Host "    Current Version: 2.2.5" -ForegroundColor White
     Write-Host "    Release Date: 2025" -ForegroundColor White
     Write-Host "    Compatibility: Windows PowerShell 5.1+" -ForegroundColor White
 
