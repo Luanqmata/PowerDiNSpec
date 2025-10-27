@@ -71,7 +71,7 @@ PowerDiNSpec is an advanced PowerShell-based reconnaissance toolkit designed for
 - Appropriate execution policy settings
 
 ### Quick Installation
-```powershell
+```Ruby
 # Clone the repository
 git clone https://github.com/Luanqmata/PowerDiNSpec.git
 
@@ -86,7 +86,7 @@ Set-ExecutionPolicy -ExecutionPolicy Unrestricted -Scope Process
 ```
 
 ### Execution Policy Solutions
-```powershell
+```Ruby
 # Method 1: Process scope (Recommended)
 Set-ExecutionPolicy -ExecutionPolicy Unrestricted -Scope Process
 
@@ -108,7 +108,7 @@ Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
 - Review results: Analyze findings in console and log files
 
 ### Scan Options Menu
-```
+```Ruby
 [ 0 ]   Help & Configuration
 [ 1 ]   Get HTTP Status Code
 [ 2 ]   Get the Page <title>
@@ -119,18 +119,18 @@ Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
 [ 7 ]   Security Headers Analysis
 [ 8 ]   DNS Zone Transfer Test
 [ 9 ]   Check DNS Records
-[10 ]   List Links Found in HTML
-[11 ]   Check the robots.txt File
-[12 ]   Check if Site has a Sitemap
-[13 ]   Capture Port's Banner's
-[14 ]   Get All Words from the Site
-[15 ]   Fuzzing Recursive
-[16 ]   Run All Scans (1 to 14)
-[17 ]   Exit
+[ 10 ]   List Links Found in HTML
+[ 11 ]   Check the robots.txt File
+[ 12 ]   Check if Site has a Sitemap
+[ 13 ]   Capture Port's Banner's
+[ 14 ]   Get All Words from the Site
+[ 15 ]   Fuzzing Recursive
+[ 16 ]   Run All Scans (1 to 14)
+[ 17 ]   Exit
 ```
 
 ### Configuration Submenu
-```
+```Ruby
 [ 0 ]   Back Menu
 [ 1 ]   Help
 [ 2 ]   Configure: Cap'port Banner - Option [13]
@@ -188,7 +188,7 @@ When enabled, automatically launches recursive fuzzing after word extraction:
 ## 📊 Output Examples
 
 ### Sample Scan Output
-```powershell
+```Ruby
 === 1. HTTP Status Code ===
 Status Code: 200 OK
 Category: Success
@@ -203,7 +203,7 @@ IPv6 Address: 2001:db8::1
 ```
 
 ### Fuzzing Results
-```powershell
+```Ruby
 [200 - OK] Depth 2 - https://target.com/admin/login
        Title: Administration Panel
        Size: 5421 bytes
@@ -238,7 +238,7 @@ You are solely responsible for ensuring proper authorization and compliance with
 ---
 
 ## 🗂 File Structure
-```
+```Ruby
 PowerDiNSpec/
 ├── PowerDiNSpec.ps1          # Main script file
 ├── Logs_PowerDns/            # Scan logs and activity records
@@ -253,7 +253,7 @@ PowerDiNSpec/
 ## 🔧 Troubleshooting
 
 ### Common Issues
-```powershell
+```Ruby
 # Execution Policy Error
 Set-ExecutionPolicy -ExecutionPolicy Unrestricted -Scope Process
 
