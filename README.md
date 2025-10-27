@@ -12,11 +12,11 @@
 
 ---
 
-# PowerDiNSpec - PowerShell DNS Recon Tool v2.2.5
+# PowerDiNSpec - PowerShell DNS Recon Tool v2.3.0
 
 [![PowerShell](https://img.shields.io/badge/PowerShell-5.1+-blue.svg)](https://docs.microsoft.com/powershell/)
 [![License](https://img.shields.io/badge/License-AGPL--3.0-green.svg)](https://www.gnu.org/licenses/agpl-3.0.en.html)
-[![Version](https://img.shields.io/badge/Version-2.2.5-red.svg)]()
+[![Version](https://img.shields.io/badge/Version-2.3.0-red.svg)]()
 
 PowerDiNSpec is an advanced PowerShell-based reconnaissance toolkit designed for comprehensive security assessments, penetration testing, and authorized vulnerability research. It provides extensive reconnaissance capabilities for web applications and DNS infrastructure.
 
