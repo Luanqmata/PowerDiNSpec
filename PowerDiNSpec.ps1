@@ -30,7 +30,7 @@ function Logo_Menu {
                                     |_  ..  _|   | |_) |/ _//\\ \ /\ / // _ \| '__|  | | | || || | | |/ __|   | |_) |/  _ \ / __|     / /
                                     |_      _|   | .__/| (//) |\ V  V /|  __/| |     | |_/ || || | | |\__ \   | .__/|  ___/| (__     |_|
                                       |_||_|     |_|    \//__/  \_/\_/  \___||_|     |____/ |_||_| |_||___/   |_|    \____| \___|
-                                                        //               | |                (_)        |_|                           (_)           2.3.0v
+                                                        //               | |                (_)        |_|                           (_)           2.3.3v
 
                                          
 "@ -split "`n"
@@ -46,10 +46,11 @@ function Logo_Menu {
 $global:PortsForBannerScan = @(21,22,80,443,3306,5432,8080)
 $global:AutoFuzzingMode = 0
 #fuzzing settings
-$global:FuzzingMaxDepth = 4
+$global:FuzzingMaxDepth = 3
 $global:FuzzingTimeoutMs = 3000
 $global:FuzzingMaxThreads = 5
 $global:FuzzingAggressive = $false
+$global:FuzzingSubdomain = $false
 $global:FuzzingStatusCodes = @(200, 301, 302, 403, 500)
 
 $global:AllScans = @(
@@ -115,7 +116,7 @@ function Show-InputPrompt {
 }
 
 # =============================================
-# FUNÇÕES AUXILIARES / Port banner grab
+# FUNÇÕES AUXILIARES / Port banner grab / fuzz
 # =============================================
 function Test-HttpService {
     param(
@@ -418,7 +419,8 @@ function Test-ValidUrl {
 function Invoke-WebRequestSafe {
     param ([string]$Uri, [string]$Method = 'Get', [int]$Timeout = 30)
     
-    return Invoke-WebRequest -Uri $Uri -Method $Method -Headers $headers -ErrorAction Stop -TimeoutSec $Timeout
+    # CORREÇÃO: Usar headers globais
+    return Invoke-WebRequest -Uri $Uri -Method $Method -Headers $global:headers -ErrorAction Stop -TimeoutSec $Timeout
 }
 
 function Handle-WebError {
@@ -444,7 +446,8 @@ function Write-Log {
         New-Item -ItemType Directory -Path $logDir -Force | Out-Null
     }
     
-    $logFilePath = Join-Path $logDir $logFile
+    $logFileName = "scan_log_$(Get-Date -Format 'yyyyMMdd').txt"
+    $logFilePath = Join-Path $logDir $logFileName
     
     Add-Content -Path $logFilePath -Value $logMessage
 }
@@ -1786,7 +1789,7 @@ function Test-StatusCodeFilter {
 }
 # FUNÇÕES DE CONFIGURAÇÃO DE FUZZING
 function Configure-FuzzingRecursive {
-     while ($true) {
+    while ($true) {
         Clear-Host 
         Logo_Menu
         Write-Host "`n                                                                 === Configure Recursive Fuzzing ===" -ForegroundColor Red
@@ -1796,19 +1799,47 @@ function Configure-FuzzingRecursive {
         Write-Host "(" -NoNewline -ForegroundColor White
         Write-Host "Configured" -NoNewline -ForegroundColor Cyan
         Write-Host ")" -NoNewline -ForegroundColor White
-        Write-Host " Max Depth: $($global:FuzzingMaxDepth)" -ForegroundColor Gray
+        Write-Host " Max Depth: " -NoNewline -ForegroundColor Gray
+    
+        if ($global:FuzzingMaxDepth -ge 1 -and $global:FuzzingMaxDepth -le 2) {
+            Write-Host "$($global:FuzzingMaxDepth)" -ForegroundColor Yellow
+        } elseif ($global:FuzzingMaxDepth -ge 3 -and $global:FuzzingMaxDepth -le 4) {
+            Write-Host "$($global:FuzzingMaxDepth)" -ForegroundColor Green
+        } elseif ($global:FuzzingMaxDepth -ge 5 -and $global:FuzzingMaxDepth -le 6) {
+            Write-Host "$($global:FuzzingMaxDepth)" -ForegroundColor DarkGreen
+        } elseif ($global:FuzzingMaxDepth -ge 7 -and $global:FuzzingMaxDepth -le 8) {
+            Write-Host "$($global:FuzzingMaxDepth)" -ForegroundColor Red
+        } elseif ($global:FuzzingMaxDepth -ge 9 -and $global:FuzzingMaxDepth -le 10) {
+            Write-Host "$($global:FuzzingMaxDepth)" -ForegroundColor DarkRed
+        } else {
+            Write-Host "$($global:FuzzingMaxDepth)" -ForegroundColor Gray
+        }
 
         Write-Host "                                                                          " -NoNewline
         Write-Host "(" -NoNewline -ForegroundColor White
         Write-Host "Configured" -NoNewline -ForegroundColor Cyan
         Write-Host ")" -NoNewline -ForegroundColor White
-        Write-Host " Timeout (ms): $($global:FuzzingTimeoutMs)" -ForegroundColor Gray
+        Write-Host " Timeout (ms): " -NoNewline -ForegroundColor Gray
+
+        # CORES POR RISCO: MENOR TIMEOUT = MAIOR RISCO = VERMELHO
+        if ($global:FuzzingTimeoutMs -ge 500 -and $global:FuzzingTimeoutMs -le 1000) {
+            Write-Host "$($global:FuzzingTimeoutMs)" -ForegroundColor DarkRed  # Muito rápido = Alto risco
+        } elseif ($global:FuzzingTimeoutMs -ge 1001 -and $global:FuzzingTimeoutMs -le 2000) {
+            Write-Host "$($global:FuzzingTimeoutMs)" -ForegroundColor Red      # Rápido = Risco moderado
+        } elseif ($global:FuzzingTimeoutMs -ge 2001 -and $global:FuzzingTimeoutMs -le 5000) {
+            Write-Host "$($global:FuzzingTimeoutMs)" -ForegroundColor Yellow   # Moderado = Risco baixo
+        } elseif ($global:FuzzingTimeoutMs -ge 5001 -and $global:FuzzingTimeoutMs -le 30000) {
+            Write-Host "$($global:FuzzingTimeoutMs)" -ForegroundColor Green    # Lento = Baixo risco
+        } else {
+            Write-Host "$($global:FuzzingTimeoutMs)" -ForegroundColor Gray
+        }
 
         Write-Host "                                                                          " -NoNewline
         Write-Host "(" -NoNewline -ForegroundColor White
         Write-Host "Configured" -NoNewline -ForegroundColor Cyan
         Write-Host ")" -NoNewline -ForegroundColor White
-        Write-Host " Max Threads: $($global:FuzzingMaxThreads)" -ForegroundColor Gray
+        Write-Host " Max Threads: " -NoNewline -ForegroundColor Gray
+        write-Host "$($global:FuzzingMaxThreads)" -ForegroundColor Magenta
 
         Write-Host "                                                                          " -NoNewline
         Write-Host "(" -NoNewline -ForegroundColor White
@@ -1817,15 +1848,13 @@ function Configure-FuzzingRecursive {
         Write-Host " Aggressive Mode: " -NoNewline -ForegroundColor Gray
         Write-Host "$(if ($global:FuzzingAggressive) { 'ENABLED' } else { 'DISABLED' })" -ForegroundColor $(if ($global:FuzzingAggressive) { "Green" } else { "Red" }) 
 
-        if ($global:FuzzingStatusCodes.Count -gt 0) {
-            Write-Host "`n                                                      [Selected Status Codes]:" -ForegroundColor Yellow
-            foreach ($code in $global:FuzzingStatusCodes) {
-                $color = Get-StatusCodeColor -StatusCode $code
-                Write-Host "                                                                           $code" -ForegroundColor $color -NoNewline
-                Write-Host " - $(Get-StatusCodeDescription -Code $code)" -ForegroundColor Gray
-            }
-        }
-        
+        Write-Host "                                                                          " -NoNewline
+        Write-Host "(" -NoNewline -ForegroundColor White
+        Write-Host "Configured" -NoNewline -ForegroundColor Cyan
+        Write-Host ")" -NoNewline -ForegroundColor White
+        Write-Host " Subdomain Fuzzing: " -NoNewline -ForegroundColor Gray
+        Write-Host "$(if ($global:FuzzingSubdomain) { 'ENABLED' } else { 'DISABLED' })" -ForegroundColor $(if ($global:FuzzingSubdomain) { "Green" } else { "Red" }) 
+
         Write-Host "`n`n                                                        [Configuration Options]`n" -ForegroundColor Red
         
         Write-Host "                                                                       Press " -NoNewline -ForegroundColor DarkRed
@@ -1843,6 +1872,19 @@ function Configure-FuzzingRecursive {
         Write-Host "                                                                       Press " -NoNewline -ForegroundColor DarkRed
         Write-Host "[4]" -NoNewline -ForegroundColor DarkGreen
         Write-Host " - Toggle Aggressive Mode" -ForegroundColor Gray
+        
+        Write-Host "                                                                       Press " -NoNewline -ForegroundColor DarkRed
+        Write-Host "[5]" -NoNewline -ForegroundColor DarkGreen
+        Write-Host " - Toggle Subdomain Fuzzing`n" -ForegroundColor Gray
+
+        if ($global:FuzzingStatusCodes.Count -gt 0) {
+            Write-Host "`n                                                      [Selected Status Codes]:" -ForegroundColor Yellow
+            foreach ($code in $global:FuzzingStatusCodes) {
+                $color = Get-StatusCodeColor -StatusCode $code
+                Write-Host "                                                                           $code" -ForegroundColor $color -NoNewline
+                Write-Host " - $(Get-StatusCodeDescription -Code $code)" -ForegroundColor Gray
+            }
+        }
         
         Write-Host "`n`n                                                        [Status Code Presets]`n" -ForegroundColor Red
         
@@ -1864,7 +1906,7 @@ function Configure-FuzzingRecursive {
         
         Write-Host "                                                                       Press " -NoNewline -ForegroundColor DarkRed
         Write-Host "[N]" -NoNewline -ForegroundColor DarkGreen
-        Write-Host " - All Except Errors     (All codes except 400, 403, 404)" -ForegroundColor Gray
+        Write-Host " - All Except Errors     (except 400, 403, 404)" -ForegroundColor Gray
         
         Write-Host "                                                                       Press " -NoNewline -ForegroundColor DarkRed
         Write-Host "[C]" -NoNewline -ForegroundColor DarkGreen
@@ -1897,8 +1939,7 @@ function Configure-FuzzingRecursive {
             }
             '2' {
                 Write-Host "`n               Current Timeout: $($global:FuzzingTimeoutMs)ms" -ForegroundColor Yellow
-                Write-Host "               Recommended: 2000-10000 (higher = more reliable but slower)" -ForegroundColor Gray
-                $newTimeout = Show-InputPrompt -input_name "Enter new Timeout (ms)" -PaddingLeft 52 -QuestionColor Green
+                $newTimeout = Show-InputPrompt -input_name "Enter new Timeout (ms) ex: 2000-10000 (higher = more reliable but slower)" -PaddingLeft 38 -QuestionColor Green
                 if ($newTimeout -match '^\d+$' -and [int]$newTimeout -ge 500 -and [int]$newTimeout -le 30000) {
                     $global:FuzzingTimeoutMs = [int]$newTimeout
                     Write-Host "`n                    Timeout set to: ${global:FuzzingTimeoutMs}ms" -ForegroundColor Green
@@ -1926,6 +1967,14 @@ function Configure-FuzzingRecursive {
                 $status = if ($global:FuzzingAggressive) { "ENABLED" } else { "DISABLED" }
                 Write-Host "`n                    Aggressive Mode: $status" -ForegroundColor $(if ($global:FuzzingAggressive) { "Green" } else { "Red" })
                 Write-Host "                    Note: Aggressive mode increases speed but may trigger WAF/IDS" -ForegroundColor Yellow
+                Start-Sleep -Seconds 1
+                continue
+            }
+            '5' {
+                $global:FuzzingSubdomain = -not $global:FuzzingSubdomain
+                $status = if ($global:FuzzingSubdomain) { "ENABLED" } else { "DISABLED" }
+                Write-Host "`n                    Subdomain Fuzzing: $status" -ForegroundColor $(if ($global:FuzzingSubdomain) { "Green" } else { "Red" })
+                Write-Host "                    Note: Subdomain fuzzing tests https://[word].domain.com.br patterns" -ForegroundColor Yellow
                 Start-Sleep -Seconds 1
                 continue
             }
@@ -1985,6 +2034,7 @@ function Configure-FuzzingRecursive {
         }
     }
 }
+
 function Get-StatusCodeDescription {
     param([int]$Code)
     
@@ -2030,14 +2080,19 @@ function ScanHTML {
         $response = Invoke-WebRequestSafe -Uri $url
         $htmlContent = $response.Content
 
-        # Extract words with improved regex - SEM FILTROS COMPLEXOS
+        # CORREÇÃO DO ENCODING - Converte caracteres malformados
+        $encoding = [System.Text.Encoding]::GetEncoding("ISO-8859-1")
+        $bytes = $encoding.GetBytes($htmlContent)
+        $htmlContent = [System.Text.Encoding]::UTF8.GetString($bytes)
+
+        # SUA FUNÇÃO ORIGINAL - SEM MUDANÇAS
         $palavras = ($htmlContent -split '[^\p{L}0-9_\-]+') |
-                    Where-Object { $_.Length -gt 2 } |  # Apenas remove palavras muito curtas
+                    Where-Object { $_.Length -gt 2 } |
                     Select-Object -Unique |
                     Sort-Object
 
         # Remove apenas palavras extremamente comuns se necessário
-        $commonWords = @('div', 'span', 'html', 'head', 'body', 'script', 'style', 'css')
+        $commonWords = @('NON9')
         $palavras = $palavras | Where-Object { $commonWords -notcontains $_.ToLower() }
 
         Write-Host "`nTotal unique words found: $($palavras.Count)" -ForegroundColor Green
@@ -2106,8 +2161,16 @@ function Start-FuzzingRecursive {
         [int]$MaxDepth = $global:FuzzingMaxDepth,
         [int]$TimeoutMs = $global:FuzzingTimeoutMs,
         [switch]$Aggressive = $global:FuzzingAggressive,
-        [int]$MaxThreads = $global:FuzzingMaxThreads
+        [int]$MaxThreads = $global:FuzzingMaxThreads,
+        [switch]$SubdomainFuzzing = $global:FuzzingSubdomain
     )
+
+    $script:TestedPaths = @{}
+    $script:totalRequests = 0
+    $script:validEndpoints = 0
+    $script:duplicatesFiltered = 0
+    $script:filteredByStatus = 0
+    $script:lastDuplicateUrl = "None"
     
     try {
         Write-Log "=== INICIANDO FUZZING RECURSIVO AVANÇADO ===" "INFO"
@@ -2120,24 +2183,18 @@ function Start-FuzzingRecursive {
         Write-Host "   Target: $url" -ForegroundColor White
         Write-Host "   Wordlist: $wordlist" -ForegroundColor White
         
+        # CONFIGURAÇÃO DE SUBDOMAIN FUZZING
+        if ($SubdomainFuzzing) {
+            Write-Host "   Subdomain Fuzzing: ENABLED" -ForegroundColor Cyan
+            Write-Log "Subdomain fuzzing habilitado" "INFO"
+        }
+        
         # MOSTRA CONFIGURAÇÃO ATUAL DE STATUS CODES
         Write-Host "   Status Codes: " -NoNewline -ForegroundColor White
         if ($global:FuzzingStatusCodes.Count -eq 0) {
             Write-Host "ALL (Showing all status codes)" -ForegroundColor Cyan
         } else {
-            $statusCodesWithColors = $global:FuzzingStatusCodes | ForEach-Object {
-                $color = Get-StatusCodeColor -StatusCode $_
-                $text = Get-StatusCodeText -StatusCode $_
-                "$($color):$text"
-            }
             Write-Host "$($global:FuzzingStatusCodes.Count) codes configured" -ForegroundColor Yellow
-            #Write-Host "   Configured Codes: " -NoNewline -ForegroundColor Gray
-            #foreach ($code in $global:FuzzingStatusCodes) {
-            #    $color = Get-StatusCodeColor -StatusCode $code
-            #    $text = Get-StatusCodeText -StatusCode $code
-            #    Write-Host "$text " -NoNewline -ForegroundColor $color
-            #}
-            #Write-Host ""
         }
         
         if (-not (Test-Path $wordlist)) {
@@ -2177,6 +2234,7 @@ function Start-FuzzingRecursive {
         Write-Host "  Timeout: ${TimeoutMs}ms" -ForegroundColor Gray
         Write-Host "  Aggressive: $(if ($Aggressive) { 'ENABLED' } else { 'DISABLED' })" -ForegroundColor Gray
         Write-Host "  Max Threads: $MaxThreads" -ForegroundColor Gray
+        Write-Host "  Subdomain Fuzzing: $(if ($SubdomainFuzzing) { 'ENABLED' } else { 'DISABLED' })" -ForegroundColor Gray
 
         # SISTEMA AVANÇADO DE DETECÇÃO DE BASE
         Write-Log "Analisando pagina base..." "INFO"
@@ -2206,22 +2264,232 @@ function Start-FuzzingRecursive {
         $startTime = Get-Date
 
         Write-Log "Variaveis de controle inicializadas" "INFO"
-
-        # FUNÇÃO DE TESTE OTIMIZADA
-        function Test-Endpoint {
-            param($testUrl, $currentDepth, $parentWord)
+        # =============================================
+        # FUNÇÕES DE SUBDOMAIN FUZZING 
+        # =============================================
+        function Invoke-SubdomainFuzzing {
+            param($baseDomain, $wordList)
             
-            # Verifica se URL já foi visitada
-            if ($visitedUrls.ContainsKey($testUrl)) {
-                $script:duplicatesFiltered++
-                $script:lastDuplicateUrl = $testUrl
-                Write-Log "URL DUPLICADA FILTRADA: $testUrl" "INFO"
-                return $false
+            Write-Log "INICIANDO SUBDOMAIN FUZZING" "INFO"
+            Write-Host "`n[SUBDOMAIN FUZZING] Starting..." -ForegroundColor Cyan
+            Write-Host "   Pattern: https://[word].$baseDomain" -ForegroundColor Gray
+            Write-Host "   Timeout: ${TimeoutMs}ms" -ForegroundColor Yellow
+            Write-Host "   IMPORTANT: Testing subdomains with shorter timeout to avoid blocking" -ForegroundColor Red
+            
+            $validSubdomains = @()
+            $testedCount = 0
+            $processedSubdomains = @{}
+            
+            # SALVA CONFIGURAÇÃO ORIGINAL
+            $originalTimeout = $TimeoutMs
+            $originalStatusCodes = $global:FuzzingStatusCodes
+            
+            # CONFIGURAÇÃO OTIMIZADA PARA SUBDOMÍNIOS
+            $subdomainTimeout = 2000
+            $global:FuzzingStatusCodes = @()
+            
+            foreach ($word in $wordList) {
+                $subdomain = "$word.$baseDomain".ToLower()
+                $testUrl = "https://$subdomain"
+                $testedCount++
+                $percentComplete = [math]::Round(($testedCount / $wordList.Count) * 100, 1)
+                
+                Write-Progress -Id 10 -Activity "SUBDOMAIN FUZZING" -Status "Testing: $subdomain" -PercentComplete $percentComplete -CurrentOperation "Subdomains found: $($validSubdomains.Count)"
+
+                # Verifica se já processou este subdomínio
+                if (-not $processedSubdomains.ContainsKey($subdomain)) {
+                    $processedSubdomains[$subdomain] = $true
+                    
+                    # Testa o subdomínio com timeout otimizado
+                    $isValid = Test-SubdomainEndpoint -testUrl $testUrl -parentWord $word -timeout $subdomainTimeout
+                    
+                    if ($isValid) {
+                        $validSubdomains += $testUrl
+                        Write-Log "Valid subdomain found: $testUrl" "INFO"
+                    }
+                }
+                
+                # Delay entre requests
+                Start-Sleep -Milliseconds (Get-Random -Minimum 50 -Maximum 100)
             }
-            $visitedUrls[$testUrl] = $true
+            
+            # RESTAURA CONFIGURAÇÃO ORIGINAL
+            $TimeoutMs = $originalTimeout
+            $global:FuzzingStatusCodes = $originalStatusCodes
+            
+            Write-Progress -Id 10 -Activity "Completed" -Completed
+            
+            # CORREÇÃO: Reportar corretamente os resultados
+            if ($validSubdomains.Count -gt 0) {
+                Write-Host "`n[SUBDOMAIN RESULTS] Found $($validSubdomains.Count) valid subdomains" -ForegroundColor Green
+                Write-Host "   Subdomains found (no recursive fuzzing will be performed on them):" -ForegroundColor Gray
+                foreach ($subdomain in $validSubdomains) {
+                    Write-Host "     - $subdomain" -ForegroundColor White
+                }
+                Write-Log "Subdomain fuzzing concluido - $($validSubdomains.Count) subdominios validos encontrados" "INFO"
+            } else {
+                Write-Host "`n[SUBDOMAIN RESULTS] No valid subdomains found" -ForegroundColor Yellow
+                Write-Host "   All subdomains timed out or returned errors" -ForegroundColor Gray
+                Write-Log "Subdomain fuzzing concluido - 0 subdominios validos encontrados" "INFO"
+            }
+            
+            return $validSubdomains
+        }
+
+        # FUNÇÃO DE TESTE DE SUBDOMÍNIO COM FALLBACK HTTP/HTTPS     
+        function Test-SubdomainEndpoint {
+            param($testUrl, $parentWord, $timeout)
             
             try {
-                # VALIDAÇÃO DA URL ANTES DO REQUEST
+                # TENTA HTTP PRIMEIRO (muitos subdomínios não têm HTTPS)
+                $httpUrl = $testUrl.Replace("https://", "http://")
+                
+                # Testa HTTP primeiro
+                $httpResult = Test-SingleSubdomain -testUrl $httpUrl -timeout $timeout
+                if ($httpResult -eq $true) {  # ← CORREÇÃO: Verificar se retorna TRUE
+                    return $true
+                }
+                
+                # Se HTTP falhou, testa HTTPS
+                $httpsResult = Test-SingleSubdomain -testUrl $testUrl -timeout $timeout
+                if ($httpsResult -eq $true) {  # ← CORREÇÃO: Verificar se retorna TRUE
+                    return $true
+                }
+                
+                return $false
+                
+            } catch {
+                Write-Log "ERRO teste subdominio $testUrl : $($_.Exception.Message)" "DEBUG"
+                return $false
+            }
+        }
+        # FUNÇÃO DE TESTE INDIVIDUAL DE SUBDOMÍNIO
+        function Test-SingleSubdomain {
+            param($testUrl, $timeout)
+            
+            try {
+                $request = [System.Net.WebRequest]::Create($testUrl)
+                $request.Timeout = $timeout
+                $request.Method = "GET"
+                $request.UserAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+                
+                $response = $request.GetResponse()
+                $statusCode = [int]$response.StatusCode
+                $contentLength = $response.ContentLength
+                $contentStream = $response.GetResponseStream()
+                
+                $reader = New-Object System.IO.StreamReader($contentStream)
+                $fullContent = $reader.ReadToEnd()
+                $reader.Close()
+                $contentStream.Close()
+                $response.Close()
+
+                # Calcula hash do conteúdo
+                $contentHash = [System.BitConverter]::ToString(
+                    [System.Security.Cryptography.MD5]::Create().ComputeHash(
+                        [System.Text.Encoding]::UTF8.GetBytes($fullContent)
+                    )
+                ).Replace("-", "").ToLower()
+
+                # VERIFICAÇÃO BÁSICA - não marca como duplicata para subdomínios
+                if ($contentHashes.ContainsKey($contentHash)) {
+                    Write-Log "CONTEUDO DUPLICADO IGNORADO: $testUrl" "DEBUG"
+                    # Para subdomínios, NÃO retorna false - só ignora o log
+                } else {
+                    # Só armazena hash de conteúdos muito pequenos (provavelmente erros)
+                    if ($contentLength -lt 500) {
+                        $contentHashes[$contentHash] = $true
+                    }
+                }
+
+                # DETECÇÃO DE SUBDOMÍNIO VÁLIDO
+                $isValidSubdomain = $statusCode -lt 400 -and $contentLength -gt 100
+
+                if ($isValidSubdomain) {
+                    $title = if ($fullContent -match '<title[^>]*>(.*?)</title>') { 
+                        $matches[1].Trim() 
+                    } else { $null }
+                    
+                    $result = [PSCustomObject]@{
+                        URL = $testUrl
+                        StatusCode = $statusCode
+                        ContentLength = $contentLength
+                        Word = $parentWord
+                        Depth = 0
+                        IsValid = $true
+                        Title = $title
+                        ContentHash = $contentHash
+                        Timestamp = Get-Date
+                        Type = "Subdomain"
+                    }
+                    
+                    $allResults.Add($result) | Out-Null
+                    $script:validEndpoints++
+                    
+                    Write-Log ("SUBDOMINIO VALIDO - STATUS " + $statusCode + ": " + $testUrl) "INFO"
+                    
+                    $statusColor = Get-StatusCodeColor -StatusCode $statusCode
+                    $statusText = Get-StatusCodeText -StatusCode $statusCode
+                    
+                    Write-Host "[SUBDOMAIN $statusText] $testUrl" -ForegroundColor $statusColor
+                    if ($title) {
+                        Write-Host "       Title: $title" -ForegroundColor Magenta
+                    }
+                    if ($contentLength -gt 0) {
+                        Write-Host "       Size: $contentLength bytes" -ForegroundColor Gray
+                    }
+                    
+                    return $true
+                } else {
+                    # Mostra resposta mesmo que não seja válida
+                    $statusColor = Get-StatusCodeColor -StatusCode $statusCode
+                    $statusText = Get-StatusCodeText -StatusCode $statusCode
+                    
+                    Write-Host "[SUBDOMAIN $statusText] $testUrl" -ForegroundColor $statusColor
+                    if ($contentLength -gt 0) {
+                        Write-Host "       Size: $contentLength bytes" -ForegroundColor DarkGray
+                    }
+                    return $false
+                }
+                
+            } catch [System.Net.WebException] {
+                $webException = $_.Exception
+                if ($webException.Response) {
+                    $statusCode = [int]$webException.Response.StatusCode
+                    $statusColor = Get-StatusCodeColor -StatusCode $statusCode
+                    $statusText = Get-StatusCodeText -StatusCode $statusCode
+                    Write-Host "[SUBDOMAIN $statusText] $testUrl" -ForegroundColor $statusColor
+                } else {
+                    # Timeout - mostra de forma discreta
+                    #Write-Host "[SUBDOMAIN TIMEOUT] $testUrl" -ForegroundColor DarkGray
+                }
+                return $false
+            } catch {
+                Write-Host "[SUBDOMAIN ERROR] $testUrl" -ForegroundColor DarkRed
+                return $false
+            } finally {
+                $script:totalRequests++
+            }
+        }
+        # =============================================
+        # FIM DAS FUNÇÕES DE SUBDOMAIN FUZZING
+        # =============================================
+        # FUNÇÃO DE TESTE OTIMIZADA 
+        function Test-Endpoint {
+            param($testUrl, $currentDepth, $parentWord)
+
+            if ($currentDepth -gt 0) {
+                $urlKey = "$currentDepth-$testUrl"
+                if ($visitedUrls.ContainsKey($urlKey)) {
+                    $script:duplicatesFiltered++
+                    $script:lastDuplicateUrl = $testUrl
+                    Write-Log "URL DUPLICADA FILTRADA: $testUrl" "DEBUG"
+                    return $false
+                }
+                $visitedUrls[$urlKey] = $true
+            }
+            
+            try {
                 if (-not $testUrl.StartsWith('http')) {
                     return $false
                 }
@@ -2236,33 +2504,31 @@ function Start-FuzzingRecursive {
                 $contentLength = $response.ContentLength
                 $contentStream = $response.GetResponseStream()
                 
-                # Lê o conteúdo completo para análise
                 $reader = New-Object System.IO.StreamReader($contentStream)
                 $fullContent = $reader.ReadToEnd()
                 $reader.Close()
                 $contentStream.Close()
                 $response.Close()
 
-                # Calcula hash do conteúdo
                 $contentHash = [System.BitConverter]::ToString(
                     [System.Security.Cryptography.MD5]::Create().ComputeHash(
                         [System.Text.Encoding]::UTF8.GetBytes($fullContent)
                     )
                 ).Replace("-", "").ToLower()
 
-                # Verifica se já vimos este conteúdo antes
+                # VERIFICAÇÃO DE DUPLICATAS APENAS PARA PATHS
                 if ($contentHashes.ContainsKey($contentHash)) {
                     $script:duplicatesFiltered++
                     $script:lastDuplicateUrl = $testUrl
-                    Write-Log "CONTEUDO DUPLICADO FILTRADO: $testUrl - Hash: $contentHash" "INFO"
+                    Write-Log "CONTEUDO DUPLICADO FILTRADO: $testUrl - Hash: $contentHash" "DEBUG"
                     return $false
                 }
-                $contentHashes[$contentHash] = $true
+                
+                if ($statusCode -ge 400 -or $contentLength -lt 500) {
+                    $contentHashes[$contentHash] = $true
+                }
 
-                # DETECÇÃO AVANÇADA DE FALSOS POSITIVOS
                 $isValidEndpoint = Test-RealEndpoint -Url $testUrl -Content $fullContent -ContentLength $contentLength -BaseSignature $baseSignature
-
-                # VERIFICA SE DEVE MOSTRAR BASEADO NO FILTRO DE STATUS CODES
                 $shouldShow = Test-StatusCodeFilter -StatusCode $statusCode
                 
                 if ($isValidEndpoint) {
@@ -2280,50 +2546,30 @@ function Start-FuzzingRecursive {
                         Title = $title
                         ContentHash = $contentHash
                         Timestamp = Get-Date
+                        Type = "Path"
                     }
                     
                     $allResults.Add($result) | Out-Null
                     $script:validEndpoints++
                     
-                    # LOG DOS ENDPOINTS VÁLIDOS
-                    Write-Log ("ENDPOINT VALIDO - STATUS " + $statusCode + ": " + $testUrl + " - Tamanho: " + $contentLength + " bytes - Titulo: " + $title) "INFO"
+                    Write-Log ("ENDPOINT VALIDO - STATUS " + $statusCode + ": " + $testUrl) "INFO"
                     
-                    # EXIBIÇÃO COLORIDA BASEADA NO STATUS CODE - APENAS SE DEVER MOSTRAR
                     if ($shouldShow) {
                         $statusColor = Get-StatusCodeColor -StatusCode $statusCode
                         $statusText = Get-StatusCodeText -StatusCode $statusCode
                         
-                        Write-Host "[$statusText] Depth $currentDepth - $testUrl" -ForegroundColor $statusColor
+                        Write-Host "[PATH $statusText Depth $currentDepth] $testUrl" -ForegroundColor $statusColor
                         if ($title) {
                             Write-Host "       Title: $title" -ForegroundColor Magenta
                         }
-                        if ($contentLength -gt 0) {
-                            Write-Host "            Size: $contentLength bytes" -ForegroundColor Gray
-                        }
-                    } else {
-                        # Mostra de forma discreta se estiver filtrado mas é válido
-                        $script:filteredByStatus++
-                        Write-Host "[FILTERED $statusCode] Depth $currentDepth - $testUrl" -ForegroundColor DarkGray
                     }
                     
                     return $true
                 } else {
-                    # Mostra apenas FALSE quando for realmente diferente (não duplicado) E se dever mostrar
-                    if (-not $contentHashes.ContainsKey($contentHash)) {
-                        if ($shouldShow) {
-                            $statusColor = Get-StatusCodeColor -StatusCode $statusCode
-                            $statusText = Get-StatusCodeText -StatusCode $statusCode
-                            
-                            Write-Log ("FALSO POSITIVO - STATUS " + $statusCode + ": " + $testUrl + " - Tamanho: " + $contentLength + " bytes") "INFO"
-                            Write-Host "[$statusText] $testUrl" -ForegroundColor $statusColor
-                            if ($contentLength -gt 0) {
-                                Write-Host "       Size: $contentLength bytes" -ForegroundColor DarkGray
-                            }
-                        } else {
-                            # Log silencioso para filtrados
-                            $script:filteredByStatus++
-                            Write-Log ("FALSO POSITIVO FILTRADO - STATUS " + $statusCode + ": " + $testUrl) "DEBUG"
-                        }
+                    if ($shouldShow) {
+                        $statusColor = Get-StatusCodeColor -StatusCode $statusCode
+                        $statusText = Get-StatusCodeText -StatusCode $statusCode
+                        Write-Host "[PATH $statusText] $testUrl" -ForegroundColor $statusColor
                     }
                     return $false
                 }
@@ -2363,7 +2609,7 @@ function Start-FuzzingRecursive {
             }
         }
 
-        # RECURSÃO INTELIGENTE COM CONTROLE DE DUPLICATAS
+        # RECURSÃO INTELIGENTE COM CONTROLE DE DUPLICATAS (mantida igual)
         function Invoke-SmartRecursion {
             param($basePath, $wordList, $currentDepth, $maxDepth)
             
@@ -2376,6 +2622,11 @@ function Start-FuzzingRecursive {
             
             $testedCount = 0
             $validPathsThisLevel = @()
+            
+            # HASH TABLE PARA CONTROLAR PATHS ÚNICOS (ADICIONADO)
+            if (-not $script:TestedPaths) {
+                $script:TestedPaths = @{}
+            }
             
             foreach ($word in $wordList) {
                 # CONSTRUÇÃO SEGURA DA URL
@@ -2391,6 +2642,15 @@ function Start-FuzzingRecursive {
                 } catch {
                     continue
                 }
+                
+                # VERIFICAÇÃO DE DUPLICATA (ADICIONADO)
+                $pathKey = $testUrl.ToLower()
+                if ($script:TestedPaths.ContainsKey($pathKey)) {
+                    $script:duplicatesFiltered++
+                    $script:lastDuplicateUrl = $testUrl
+                    continue  # Pula URLs já testadas
+                }
+                $script:TestedPaths[$pathKey] = $true
                 
                 # PALAVRAS QUE NUNCA DEVEM RECURSAR
                 $noRecursionWords = @('non9')
@@ -2466,7 +2726,27 @@ function Start-FuzzingRecursive {
             }
         }
 
-        # INICIA FUZZING PRINCIPAL
+        # INICIA FUZZING DE SUBDOMÍNIOS (SE HABILITADO)
+        if ($SubdomainFuzzing) {
+            $validSubdomains = Invoke-SubdomainFuzzing -baseDomain $baseHost -wordList $words
+            
+            if ($validSubdomains.Count -gt 0) {
+                Write-Host "`n[SUBDOMAIN RESULTS] Found $($validSubdomains.Count) valid subdomains" -ForegroundColor Green
+                #foreach ($subdomain in $validSubdomains) { #recursao em subdominios desabilitada
+                #    Write-Host "  -> Starting recursive fuzzing on: $subdomain" -ForegroundColor Yellow
+                #    Invoke-SmartRecursion -basePath "$subdomain/" -wordList $words -currentDepth 1 -maxDepth $MaxDepth
+                #}
+                Write-Host "   Subdomains found (no recursive fuzzing will be performed on them):" -ForegroundColor Gray
+                foreach ($subdomain in $validSubdomains) {
+                    Write-Host "     - $subdomain" -ForegroundColor White
+                }
+            } else {
+                Write-Host "`n[SUBDOMAIN RESULTS] No valid subdomains found" -ForegroundColor Yellow
+                Write-Host "   All subdomains timed out or returned errors" -ForegroundColor Gray
+            }
+        }
+
+        # INICIA FUZZING PRINCIPAL NO DOMÍNIO ORIGINAL
         Write-Log "INICIANDO SCAN RECURSIVO PRINCIPAL" "INFO"
         Write-Host "`n[FUZZING] Starting smart recursive scan..." -ForegroundColor Magenta
         if ($global:FuzzingStatusCodes.Count -gt 0) {
@@ -2478,11 +2758,11 @@ function Start-FuzzingRecursive {
             }
             Write-Host ""
         }
-        Write-Host "          (Duplicates and filtered status codes are shown in dark gray)`n" -ForegroundColor Gray
+        Write-Host "                   (Duplicates and filtered status codes are shown in dark gray)`n" -ForegroundColor Gray
         
         Invoke-SmartRecursion -basePath $baseUrl -wordList $words -currentDepth 1 -maxDepth $MaxDepth
 
-        # RELATÓRIO FINAL
+        # RELATÓRIO FINAL (mantido igual)
         $endTime = Get-Date
         $duration = $endTime - $startTime
         $requestsPerSecond = [math]::Round($script:totalRequests / [math]::Max($duration.TotalSeconds, 1), 2)
@@ -2499,7 +2779,6 @@ function Start-FuzzingRecursive {
         Write-Host "   Total Requests: $($script:totalRequests)" -ForegroundColor White
         Write-Host "   Valid Endpoints: $($script:validEndpoints)" -ForegroundColor Cyan
         Write-Host "   Duplicates Filtered: $($script:duplicatesFiltered)" -ForegroundColor DarkYellow
-        #Write-Host "   Status Code Filtered: $($script:filteredByStatus)" -ForegroundColor DarkYellow
         Write-Host "   Duration: $([math]::Round($duration.TotalSeconds, 2))s" -ForegroundColor White
         Write-Host "   Speed: $requestsPerSecond req/s" -ForegroundColor White
 
@@ -2514,30 +2793,46 @@ function Start-FuzzingRecursive {
             Write-Log "RELATORIO FINAL: $($finalResults.Count) endpoints validos encontrados (apos filtro)" "INFO"
             Write-Host "`n[VALID ENDPOINTS FOUND]:" -ForegroundColor Green
             
-            # Mostra resultados com cores na tabela
-            foreach ($result in $finalResults) {
-                $statusColor = Get-StatusCodeColor -StatusCode $result.StatusCode
-                $statusText = Get-StatusCodeText -StatusCode $result.StatusCode
-                
-                Write-Host "  [$statusText] " -NoNewline -ForegroundColor $statusColor
-                Write-Host "Depth $($result.Depth) - $($result.URL)" -ForegroundColor White
-                if ($result.Title) {
-                    Write-Host "       Title: $($result.Title)" -ForegroundColor Magenta
+            # Agrupa por tipo para melhor organização
+            $subdomainResults = $finalResults | Where-Object { $_.Type -eq "Subdomain" }
+            $pathResults = $finalResults | Where-Object { $_.Type -eq "Path" }
+            
+            if ($subdomainResults.Count -gt 0) {
+                Write-Host "`n  [SUBDOMAINS]:" -ForegroundColor Cyan
+                foreach ($result in $subdomainResults) {
+                    $statusColor = Get-StatusCodeColor -StatusCode $result.StatusCode
+                    $statusText = Get-StatusCodeText -StatusCode $result.StatusCode
+                    
+                    Write-Host "    [$statusText] " -NoNewline -ForegroundColor $statusColor
+                    Write-Host "$($result.URL)" -ForegroundColor White
+                    if ($result.Title) {
+                        Write-Host "         Title: $($result.Title)" -ForegroundColor Magenta
+                    }
                 }
-                if ($result.ContentLength -gt 0) {
-                    Write-Host "       Size: $($result.ContentLength) bytes" -ForegroundColor Gray
+            }
+            
+            if ($pathResults.Count -gt 0) {
+                Write-Host "`n  [PATHS]:" -ForegroundColor Cyan
+                foreach ($result in $pathResults) {
+                    $statusColor = Get-StatusCodeColor -StatusCode $result.StatusCode
+                    $statusText = Get-StatusCodeText -StatusCode $result.StatusCode
+                    
+                    Write-Host "    [$statusText] " -NoNewline -ForegroundColor $statusColor
+                    Write-Host "Depth $($result.Depth) - $($result.URL)" -ForegroundColor White
+                    if ($result.Title) {
+                        Write-Host "         Title: $($result.Title)" -ForegroundColor Magenta
+                    }
                 }
-                Write-Host ""
             }
             
             # Salva resultados em arquivo
             $resultsFile = "fuzzing_results_$(Get-Date -Format 'yyyyMMdd_HHmmss').csv"
             $finalResults | Export-Csv -Path $resultsFile -NoTypeInformation
             Write-Log "Resultados salvos em: $resultsFile" "INFO"
-            Write-Host "   Results saved to: $resultsFile" -ForegroundColor Gray
+            Write-Host "`n   Results saved to: $resultsFile" -ForegroundColor Gray
             
             return $finalResults
-        }else {
+        } else {
             Write-Log "Nenhum endpoint valido encontrado apos filtro" "INFO"
             Write-Host "`n[RESULTS] No real endpoints found (after status code filtering)" -ForegroundColor Yellow
             return @()
@@ -2548,6 +2843,12 @@ function Start-FuzzingRecursive {
         Write-Host "[FATAL ERROR] $($_.Exception.Message)" -ForegroundColor Red
         return @()
     } finally {
+        Remove-Variable -Name "TestedPaths" -Scope Script -ErrorAction SilentlyContinue
+        Remove-Variable -Name "totalRequests" -Scope Script -ErrorAction SilentlyContinue
+        Remove-Variable -Name "validEndpoints" -Scope Script -ErrorAction SilentlyContinue
+        Remove-Variable -Name "duplicatesFiltered" -Scope Script -ErrorAction SilentlyContinue
+        Remove-Variable -Name "filteredByStatus" -Scope Script -ErrorAction SilentlyContinue
+        Remove-Variable -Name "lastDuplicateUrl" -Scope Script -ErrorAction SilentlyContinue
         Write-Log "=== FUZZING RECURSIVO FINALIZADO ===" "INFO"
     }
 }
@@ -2568,11 +2869,10 @@ function Test-RealEndpoint {
         return $false # Conteúdo idêntico ao base
     }
 
-    # 2. Verificação de páginas de erro
+    # 2. Verificação de páginas de erro - CRITÉRIOS MAIS FLEXÍVEIS
     $errorPatterns = @(
-        "404", "Not Found", "Page Not Found", "Error", "Invalid", "Cannot GET",
-        "Route not found", "The resource cannot be found", "Object not found",
-        "404 Not Found", "404 Error", "Page Not Found"
+        "404 Not Found", "404 Error", "Page Not Found", "Error 404",
+        "Object not found", "The resource cannot be found"
     )
 
     foreach ($pattern in $errorPatterns) {
@@ -2581,8 +2881,9 @@ function Test-RealEndpoint {
         }
     }
 
-    # 3. Verificação de tamanho (páginas muito pequenas geralmente são erros)
-    if ($ContentLength -lt 100 -and $BaseSignature.ContentLength -gt 1000) {
+    # 3. Verificação de tamanho - MAIS PERMISSIVO
+    # Páginas de listagem de diretório (como /images) são válidas mesmo com conteúdo diferente
+    if ($ContentLength -lt 50 -and $BaseSignature.ContentLength -gt 1000) {
         return $false
     }
 
@@ -2591,28 +2892,33 @@ function Test-RealEndpoint {
         return $false
     }
 
-    # 5. Verificação de redirect para página principal
+    # 5. SE É UMA PÁGINA DE LISTAGEM DE DIRETÓRIO, É VÁLIDA
+    if ($Content -match "Index of /" -or $Content -match "Directory listing for /") {
+        return $true
+    }
+
+    # 6. SE TEM TÍTULO DIFERENTE E CONTEÚDO SIGNIFICATIVO, É VÁLIDO
+    $title = if ($Content -match '<title[^>]*>(.*?)</title>') { 
+        $matches[1].Trim() 
+    } else { $null }
+    
+    if ($title -and $title -ne $BaseSignature.Title -and $ContentLength -gt 500) {
+        return $true
+    }
+
+    # 7. Verificação de redirect para página principal
     if ($Content -match 'window\.location|http-equiv\s*=\s*["'']refresh["'']') {
         if ($Content -match $BaseSignature.Url) {
             return $false
         }
     }
 
-    # 6. Verificação de páginas de archive/listagem genérica do WordPress
-    $wpGenericPatterns = @(
-        "archive", "category", "tag", "author", "date", "search",
-        "is_404", "page-not-found", "error-404",
-        "Nothing found", "No posts found"
-    )
-
-    foreach ($pattern in $wpGenericPatterns) {
-        if ($Content -imatch $pattern -and $ContentLength -lt 1500) {
-            return $false
-        }
+    # 8. Se passou por todas as verificações e tem conteúdo razoável, é válido
+    if ($ContentLength -gt 200 -and $statusCode -lt 400) {
+        return $true
     }
 
-    # Se passou por todas as verificações, é provavelmente um endpoint válido
-    return $true
+    return $false
 }
 # =============================================
 # FUNÇÕES DE EXECUÇÃO E MENU
@@ -3132,7 +3438,7 @@ function PowerDiNSpec {
                     Write-Host ""
                 }
                     Write-host "`n`n`n"
-                    $option_costumization = Show-InputPrompt -input_name "Choose an option (0-4)" -PaddingLeft 35
+                    $option_costumization = Show-InputPrompt -input_name "Choose an option (0-5)" -PaddingLeft 35
 
                     $choice = 0 
                     if (-not [int]::TryParse($option_costumization, [ref]$choice)) {
@@ -3190,7 +3496,7 @@ function PowerDiNSpec {
                             continue
                         }
                         default {
-                            Write-Host "`n`n               Invalid option. Choose a number between 0 and 4." -ForegroundColor Red
+                            Write-Host "`n`n               Invalid option. Choose a number between 0 and 5." -ForegroundColor Red
                             Write-Host "`n               Press Enter to continue..." -ForegroundColor Gray
                             $null = Read-Host
                             continue
