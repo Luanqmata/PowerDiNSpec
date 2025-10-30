@@ -1,5 +1,5 @@
 
-# PowerDiNSpec - PowerShell DNS Recon Tool v2.3.0
+# PowerDiNSpec - PowerShell DNS Recon Tool v2.3.4
 
 ---
 
