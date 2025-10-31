@@ -132,24 +132,47 @@ function Test-HttpService {
         $WebPorts = @(80, 443, 8080, 8443, 8888, 9080, 9090, 8000, 3000, 5000, 7443, 9443)
         
         if ($Port -in $WebPorts) {
-            # PRIMEIRO: Tenta WebRequest (HEAD) - Mais rápido e limpo
-            $headBanner = Invoke-WebRequestMethod -TargetHost $TargetHost -Port $Port -Timeout $Timeout -Method "HEAD" -UseSSL $UseSSL
+            #  CORREÇÃO: URI CORRETA COM HOST HEADER
+            $uri = if ($UseSSL) { "https://${TargetHost}:${Port}/" } else { "http://${TargetHost}:${Port}/" }
             
-            # SEGUNDO: Se HEAD não retornou Server header, tenta GET
-            if ($headBanner -and -not $headBanner.Contains("Server:")) {
-                $getBanner = Invoke-WebRequestMethod -TargetHost $TargetHost -Port $Port -Timeout $Timeout -Method "GET" -UseSSL $UseSSL
-                if ($getBanner -and $getBanner.Contains("Server:")) {
-                    return $getBanner
+            try {
+                $request = [System.Net.WebRequest]::Create($uri)
+                $request.Timeout = $Timeout
+                $request.Method = "HEAD"
+                
+                #  HEADERS COMPATÍVEIS
+                $request.UserAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+                $request.Accept = "*/*"
+                
+                #  HOST HEADER CORRETO - EVITA HTTP 400
+                $request.Host = $TargetHost
+                
+                $response = $request.GetResponse()
+                $serverHeader = $response.Headers["Server"]
+                $poweredBy = $response.Headers["X-Powered-By"]
+                $statusCode = [int]$response.StatusCode
+                
+                $bannerInfo = "HTTP/$($response.ProtocolVersion) $statusCode $($response.StatusDescription)"
+                if ($serverHeader) { $bannerInfo += " | Server: $serverHeader" }
+                if ($poweredBy) { $bannerInfo += " | X-Powered-By: $poweredBy" }
+                
+                $response.Close()
+                return $bannerInfo
+            }
+            catch [System.Net.WebException] {
+                $response = $_.Exception.Response
+                if ($response) {
+                    $statusCode = [int]$response.StatusCode
+                    $serverHeader = $response.Headers["Server"]
+                    $bannerInfo = "HTTP/1.1 $statusCode"
+                    if ($serverHeader) { $bannerInfo += " | Server: $serverHeader" }
+                    return $bannerInfo
                 }
+                return $null
             }
-            
-            # TERCEIRO: Se WebRequest falhou, tenta Socket
-            if (-not $headBanner) {
-                $socketBanner = Get-HttpViaSocket -TargetHost $TargetHost -Port $Port -Timeout $Timeout -UseSSL $UseSSL
-                return $socketBanner
+            catch {
+                return $null
             }
-            
-            return $headBanner
         }
         else {
             return $null
@@ -159,7 +182,6 @@ function Test-HttpService {
         return $null
     }
 }
-
 # === Funçoes auxiliar das auxiliares para Test-HttpService via socket etc ===
 function Invoke-WebRequestMethod {
     param(
@@ -222,7 +244,6 @@ function Invoke-WebRequestMethod {
         return $null
     }
 }
-
 function Get-HttpViaSocket {
     param(
         [string]$TargetHost,
@@ -241,6 +262,7 @@ function Get-HttpViaSocket {
             if ($client.Connected) {
                 $stream = $client.GetStream()
                 
+                #  CORREÇÃO: HEADER HOST CORRETO - EVITA HTTP 400
                 $headRequest = @"
 HEAD / HTTP/1.1`r`n
 Host: $TargetHost`r`n
@@ -329,8 +351,18 @@ function Read-StreamResponse {
                 try {
                     $read = $Stream.Read($readBuffer, 0, 4096)
                     if ($read -gt 0) {
-                        $chunk = [System.Text.Encoding]::ASCII.GetString($readBuffer, 0, $read)
-                        [void]$responseBuilder.Append($chunk)
+                        #  CORREÇÃO: SINTAXE CORRETA DO IF
+                        $cleanChunk = ""
+                        for ($i = 0; $i -lt $read; $i++) {
+                            $byte = $readBuffer[$i]
+                            # Mantém apenas caracteres ASCII imprimíveis (32-126) e quebras de linha
+                            if (($byte -ge 32 -and $byte -le 126) -or $byte -eq 10 -or $byte -eq 13) {
+                                $cleanChunk += [char]$byte
+                            } else {
+                                $cleanChunk += "?"  # Substitui caracteres inválidos
+                            }
+                        }
+                        [void]$responseBuilder.Append($cleanChunk)
                     }
                 }
                 catch {
@@ -713,7 +745,6 @@ function ScanLinks {
         Write-ErrorWeb -ErrorObject $_
     }
 }
-
 function ScanRobotsTxt {
     param ([string]$url)
     try {
@@ -723,91 +754,155 @@ function ScanRobotsTxt {
         $robotsUrl = "$url/robots.txt"
         $response = Invoke-WebRequestSafe -Uri $robotsUrl
         
+        # CORREÇÃO: DEFINIR $content ANTES DE USAR
         $content = $response.Content.Trim()
         $lines = $content -split "`n" | Where-Object { $_.Trim() -ne '' }
 
+        # VERIFICAÇÃO DE CONTEÚDO VÁLIDO
+        if ([string]::IsNullOrWhiteSpace($content) -or $lines.Count -eq 0) {
+            Write-Host "`n  robots.txt found but appears to be empty or malformed." -ForegroundColor Yellow
+            Write-Host "  Raw content:" -ForegroundColor Cyan
+            Write-Host $content -ForegroundColor Gray
+            Write-Log "Robots.txt is empty or malformed" "WARNING"
+            return
+        }
+
+        Write-Host "`n  robots.txt FOUND AND ANALYZED" -ForegroundColor Green
         
-        if ($lines.Count -gt 0) {
+        # EXTRAÇÃO ROBUSTA COM VERIFICAÇÕES
+        $userAgents = @()
+        $disallowed = @()
+        $allowed = @()
+        $sitemaps = @()
+        $crawlDelays = @()
 
-            $userAgents = $lines | Where-Object { $_ -match '^User-agent:' } | ForEach-Object { $_.Replace('User-agent:', '').Trim() }
-            $disallowed = $lines | Where-Object { $_ -match '^Disallow:' } | ForEach-Object { $_.Replace('Disallow:', '').Trim() }
-            $allowed = $lines | Where-Object { $_ -match '^Allow:' } | ForEach-Object { $_.Replace('Allow:', '').Trim() }
-            $sitemaps = $lines | Where-Object { $_ -match '^Sitemap:' } | ForEach-Object { $_.Replace('Sitemap:', '').Trim() }
-            $crawlDelays = $lines | Where-Object { $_ -match '^Crawl-delay:' } | ForEach-Object { $_.Replace('Crawl-delay:', '').Trim() }
+        foreach ($line in $lines) {
+            $trimmedLine = $line.Trim()
+            
+            if ($trimmedLine -match '^User-agent:\s*(.+)') {
+                $userAgents += $matches[1].Trim()
+            }
+            elseif ($trimmedLine -match '^Disallow:\s*(.+)') {
+                $disallowed += $matches[1].Trim()
+            }
+            elseif ($trimmedLine -match '^Allow:\s*(.+)') {
+                $allowed += $matches[1].Trim()
+            }
+            elseif ($trimmedLine -match '^Sitemap:\s*(.+)') {
+                $sitemaps += $matches[1].Trim()
+            }
+            elseif ($trimmedLine -match '^Crawl-delay:\s*(.+)') {
+                $crawlDelays += $matches[1].Trim()
+            }
+        }
 
-            if ($userAgents.Count -gt 0) {
-                Write-Host "`nUSER AGENTS TARGETED ($($userAgents.Count)):" -ForegroundColor Cyan
-                $userAgents | ForEach-Object {
+        # ANÁLISE DE USER AGENTS
+        if ($userAgents.Count -gt 0) {
+            Write-Host "`nUSER AGENTS TARGETED ($($userAgents.Count)):" -ForegroundColor Cyan
+            $userAgents | ForEach-Object {
+                if (-not [string]::IsNullOrWhiteSpace($_)) {
                     Write-Host "  - $_" -ForegroundColor White
                 }
             }
+        } else {
+            Write-Host "`nUSER AGENTS: No specific user agents defined (applies to all crawlers)" -ForegroundColor Yellow
+        }
 
-            if ($disallowed.Count -gt 0) {
-                Write-Host "`nDISALLOWED PATHS ($($disallowed.Count)):" -ForegroundColor Red
-                $disallowed | ForEach-Object {
-                    if ([string]::IsNullOrWhiteSpace($_)) {
-                        Write-Host "  - (Empty - allows all)" -ForegroundColor Green
-                    } else {
-                        Write-Host "  - $_" -ForegroundColor Yellow
-                    }
+        # ANÁLISE DE PATHS DISALLOWED
+        if ($disallowed.Count -gt 0) {
+            Write-Host "`nDISALLOWED PATHS ($($disallowed.Count)):" -ForegroundColor Red
+            $disallowed | ForEach-Object {
+                if ([string]::IsNullOrWhiteSpace($_)) {
+                    Write-Host "  - (Empty - allows all)" -ForegroundColor Green
+                } else {
+                    Write-Host "  - $_" -ForegroundColor Yellow
                 }
-
-                $sensitivePaths = $disallowed | Where-Object { 
-                    $_ -match '(admin|login|config|setup|debug|backup|sql|database|\.env|\.git|wp-|phpmyadmin|cpanel)' 
-                }
-                if ($sensitivePaths.Count -gt 0) {
-                    Write-Host "`nSENSITIVE PATHS FOUND:" -ForegroundColor Red
-                    $sensitivePaths | ForEach-Object {
-                        Write-Host "  [!] $_" -ForegroundColor Red
-                    }
-                }
-            } else {
-                Write-Host "`nDISALLOWED PATHS: None found" -ForegroundColor Green
             }
 
-            if ($allowed.Count -gt 0) {
-                Write-Host "`nALLOWED PATHS ($($allowed.Count)):" -ForegroundColor Green
-                $allowed | ForEach-Object {
-                    Write-Host "  - $_" -ForegroundColor White
-                }
+            # DETECÇÃO DE PATHS SENSÍVEIS
+            $sensitivePaths = $disallowed | Where-Object { 
+                -not [string]::IsNullOrWhiteSpace($_) -and 
+                $_ -match '(admin|login|config|setup|debug|backup|sql|database|\.env|\.git|wp-|phpmyadmin|cpanel|\.bak|\.old|\.tmp|password|secret|private)'
             }
             
-            if ($sitemaps.Count -gt 0) {
-                Write-Host "`nSITEMAP REFERENCES ($($sitemaps.Count)):" -ForegroundColor Magenta
-                $sitemaps | ForEach-Object {
+            if ($sensitivePaths.Count -gt 0) {
+                Write-Host "`nSENSITIVE PATHS FOUND ($($sensitivePaths.Count)):" -ForegroundColor Red
+                $sensitivePaths | ForEach-Object {
+                    Write-Host "  [!] $_" -ForegroundColor Red
+                }
+                
+                # SCORE DE SEGURANÇA
+                $securityScore = 100 - ($sensitivePaths.Count * 10)
+                if ($securityScore -lt 0) { $securityScore = 0 }
+                
+                Write-Host "`n  SECURITY ASSESSMENT:" -ForegroundColor $(if ($securityScore -ge 70) { "Green" } elseif ($securityScore -ge 40) { "Yellow" } else { "Red" })
+                Write-Host "    Score: $securityScore/100" -ForegroundColor White
+                Write-Host "    Warning: $($sensitivePaths.Count) sensitive paths exposed" -ForegroundColor $(if ($sensitivePaths.Count -gt 3) { "Red" } else { "Yellow" })
+            }
+        } else {
+            Write-Host "`nDISALLOWED PATHS: None found (all paths are accessible to crawlers)" -ForegroundColor Green
+        }
+
+        # ANÁLISE DE PATHS ALLOWED
+        if ($allowed.Count -gt 0) {
+            Write-Host "`nALLOWED PATHS ($($allowed.Count)):" -ForegroundColor Green
+            $allowed | ForEach-Object {
+                if (-not [string]::IsNullOrWhiteSpace($_)) {
                     Write-Host "  - $_" -ForegroundColor White
                 }
             }
-            
-            if ($crawlDelays.Count -gt 0) {
-                Write-Host "`nCRAWL DELAYS:" -ForegroundColor Yellow
-                $crawlDelays | ForEach-Object {
+        }
+        
+        # SITEMAP REFERENCES
+        if ($sitemaps.Count -gt 0) {
+            Write-Host "`nSITEMAP REFERENCES ($($sitemaps.Count)):" -ForegroundColor Magenta
+            $sitemaps | ForEach-Object {
+                if (-not [string]::IsNullOrWhiteSpace($_)) {
+                    Write-Host "  - $_" -ForegroundColor White
+                }
+            }
+        }
+        
+        # CRAWL DELAYS
+        if ($crawlDelays.Count -gt 0) {
+            Write-Host "`nCRAWL DELAYS:" -ForegroundColor Yellow
+            $crawlDelays | ForEach-Object {
+                if (-not [string]::IsNullOrWhiteSpace($_)) {
                     Write-Host "  - $_ seconds" -ForegroundColor White
                 }
             }
+        }
 
-            Write-Host "`nCOMPLETE RAW CONTENT:" -ForegroundColor DarkRed
-            Write-Host $content -ForegroundColor Gray
-            
-            $contentLength = $content.Length
-            Write-Host "`nFILE INFORMATION:" -ForegroundColor Yellow
-            Write-Host "  Content Length: $contentLength characters" -ForegroundColor White
-            Write-Host "  Approx. Size: $([math]::Round($contentLength / 1024, 2)) KB" -ForegroundColor White
-            Write-Host "  Lines: $($lines.Count)" -ForegroundColor White
+        # EXIBIÇÃO DO CONTEÚDO COMPLETO
+        Write-Host "`nCOMPLETE RAW CONTENT:" -ForegroundColor DarkRed
+        if ($content.Length -gt 2000) {
+            Write-Host $content.Substring(0, 2000) -ForegroundColor Gray
+            Write-Host "`n... (content truncated - too large)" -ForegroundColor DarkGray
         } else {
-            Write-Host "  robots.txt found but appears to be empty or malformed." -ForegroundColor Yellow
-            Write-Host "  Raw content:" -ForegroundColor Cyan
             Write-Host $content -ForegroundColor Gray
         }
         
-        Write-Log "Robots.txt comprehensive analysis completed: $($lines.Count) lines, $contentLength characters"
+        # ESTATÍSTICAS DETALHADAS
+        $contentLength = $content.Length
+        Write-Host "`nFILE INFORMATION:" -ForegroundColor Yellow
+        Write-Host "  Content Length: $contentLength characters" -ForegroundColor White
+        Write-Host "  Approx. Size: $([math]::Round($contentLength / 1024, 2)) KB" -ForegroundColor White
+        Write-Host "  Lines: $($lines.Count)" -ForegroundColor White
+        Write-Host "  User Agents: $($userAgents.Count)" -ForegroundColor White
+        Write-Host "  Disallowed Paths: $($disallowed.Count)" -ForegroundColor White
+        Write-Host "  Allowed Paths: $($allowed.Count)" -ForegroundColor White
+        Write-Host "  Sitemap References: $($sitemaps.Count)" -ForegroundColor White
+        Write-Host "  Crawl Delays: $($crawlDelays.Count)" -ForegroundColor White
+        
+        # LOG COMPLETO
+        Write-Log "Robots.txt analysis completed: $($lines.Count) lines, $contentLength chars, $($disallowed.Count) disallowed paths"
         
     } catch {
         Write-Host "`n  robots.txt not found or inaccessible." -ForegroundColor Red
+        Write-Host "  Error: $($_.Exception.Message)" -ForegroundColor DarkRed
         Write-Log "Robots.txt not found: $($_.Exception.Message)" "WARNING"
     }
 }
-
 function ScanSitemap {
     param ([string]$url)
     try {
@@ -816,37 +911,59 @@ function ScanSitemap {
         
         $sitemapUrl = "$url/sitemap.xml"
         $response = Invoke-WebRequestSafe -Uri $sitemapUrl
+        
+        #  CORREÇÃO: DEFINIR $content ANTES DE USAR
+        $content = $response.Content.Trim()
         $lines = $content -split "`n" | Where-Object { $_.Trim() -ne '' }
 
-        $content = $response.Content.Trim()
+        #  VERIFICAÇÃO DE CONTEÚDO VÁLIDO
+        if ([string]::IsNullOrWhiteSpace($content)) {
+            Write-Host "`n  sitemap.xml found but content is empty" -ForegroundColor Yellow
+            Write-Log "Sitemap.xml is empty" "WARNING"
+            return
+        }
         
         if ($content -match '<urlset') {
-            Write-Host "`n  STANDARD SITEMAP DETECTED (XML FORMAT)" -ForegroundColor Gray
-            $lines = $content -split "`n" | Where-Object { $_.Trim() -ne '' }
+            Write-Host "`n  STANDARD SITEMAP DETECTED (XML FORMAT)" -ForegroundColor Green
             $urls = @()
             
+            #  EXTRAÇÃO MELHORADA DE URLs
             $locMatches = [regex]::Matches($content, '<loc>\s*([^<]+)\s*</loc>', [System.Text.RegularExpressions.RegexOptions]::IgnoreCase)
-            $urls += $locMatches | ForEach-Object { $_.Groups[1].Value.Trim() }
+            $urls += $locMatches | ForEach-Object { 
+                if ($_.Groups[1].Success) {
+                    $_.Groups[1].Value.Trim()
+                }
+            }
             
             $urlMatches = [regex]::Matches($content, '<url>\s*<loc>([^<]+)</loc>', [System.Text.RegularExpressions.RegexOptions]::IgnoreCase)
-            $urls += $urlMatches | ForEach-Object { $_.Groups[1].Value.Trim() }
+            $urls += $urlMatches | ForEach-Object { 
+                if ($_.Groups[1].Success) {
+                    $_.Groups[1].Value.Trim()
+                }
+            }
             
-            $urls = $urls | Where-Object { -not [string]::IsNullOrWhiteSpace($_) } | Select-Object -Unique
+            #  FILTRAGEM MELHORADA
+            $urls = $urls | Where-Object { 
+                -not [string]::IsNullOrWhiteSpace($_) -and $_.StartsWith('http')
+            } | Select-Object -Unique
             
             Write-Host "`nTOTAL URLs EXTRACTED: $($urls.Count)" -ForegroundColor Green
             
             if ($urls.Count -gt 0) {
-                Write-Host "`nALL URLs FOUND:" -ForegroundColor Red
+                Write-Host "`nALL URLs FOUND:" -ForegroundColor Cyan
                 $urls | ForEach-Object {
                     Write-Host "  - $_" -ForegroundColor White
                 }
                 
+                #  CATEGORIZAÇÃO MELHORADA
                 $categories = @{
                     "Images" = $urls | Where-Object { $_ -match '\.(jpg|jpeg|png|gif|bmp|svg|webp)(\?|$)' }
                     "PDFs" = $urls | Where-Object { $_ -match '\.pdf(\?|$)' }
                     "Documents" = $urls | Where-Object { $_ -match '\.(doc|docx|xls|xlsx|ppt|pptx)(\?|$)' }
-                    "Admin" = $urls | Where-Object { $_ -match '(admin|login|dashboard|panel|wp-admin)' }
-                    "API" = $urls | Where-Object { $_ -match '(api|json|xml|rest)' }
+                    "Admin" = $urls | Where-Object { $_ -match '(admin|login|dashboard|panel|wp-admin|administrator)' }
+                    "API" = $urls | Where-Object { $_ -match '(api|json|xml|rest|graphql|soap)' }
+                    "JavaScript" = $urls | Where-Object { $_ -match '\.(js|jsx|ts|tsx)(\?|$)' }
+                    "CSS" = $urls | Where-Object { $_ -match '\.(css|scss|sass|less)(\?|$)' }
                 }
                 
                 Write-Host "`nURL CATEGORIES:" -ForegroundColor Magenta
@@ -857,8 +974,9 @@ function ScanSitemap {
                     }
                 }
                 
+                #  DETECÇÃO DE URLs INTERESSANTES
                 $interestingUrls = $urls | Where-Object { 
-                    $_ -match '(admin|login|config|setup|debug|backup|test|dev|staging)' 
+                    $_ -match '(admin|login|config|setup|debug|backup|test|dev|staging|secret|private|internal)' 
                 }
                 if ($interestingUrls.Count -gt 0) {
                     Write-Host "`nINTERESTING/ADMIN URLs:" -ForegroundColor Red
@@ -866,11 +984,12 @@ function ScanSitemap {
                         Write-Host "  [!] $_" -ForegroundColor Red
                     }
                 }
+            } else {
+                Write-Host "`n  No valid URLs found in sitemap" -ForegroundColor Yellow
             }
             
         } elseif ($content -match '^http' -or $content -match 'sitemap') {
-            Write-Host "`n  SITEMAP INDEX DETECTED" -ForegroundColor Gray
-            $lines = $content -split "`n" | Where-Object { $_.Trim() -ne '' }
+            Write-Host "`n  SITEMAP INDEX DETECTED" -ForegroundColor Green
             $sitemapRefs = $content -split "`n" | Where-Object { 
                 $_ -match '^http' -or $_ -match 'sitemap' -or $_ -match '\.xml'
             } | ForEach-Object { $_.Trim() } | Where-Object { -not [string]::IsNullOrWhiteSpace($_) }
@@ -882,24 +1001,37 @@ function ScanSitemap {
                 $sitemapRefs | ForEach-Object {
                     Write-Host "  - $_" -ForegroundColor White
                 }
+            } else {
+                Write-Host "`n  No valid sitemap references found" -ForegroundColor Yellow
             }
             
         } else {
             Write-Host "`nUNKNOWN SITEMAP FORMAT" -ForegroundColor Yellow
+            Write-Host "  Raw content:" -ForegroundColor Gray
+            Write-Host $content -ForegroundColor DarkGray
         }
         
-        Write-Host "`nCOMPLETE RAW CONTENT:" -ForegroundColor DarkRed
-        Write-Host $content -ForegroundColor Gray
-
+        #  EXIBIÇÃO DO CONTEÚDO CRU (SE NÃO FOR MUITO GRANDE)
         $contentLength = $content.Length
+        if ($contentLength -lt 5000) {
+            Write-Host "`nCOMPLETE RAW CONTENT:" -ForegroundColor DarkYellow
+            Write-Host $content -ForegroundColor Gray
+        } else {
+            Write-Host "`nCONTENT PREVIEW (first 1000 chars):" -ForegroundColor DarkYellow
+            Write-Host $content.Substring(0, 1000) -ForegroundColor Gray
+            Write-Host "`n... (content truncated - too large)" -ForegroundColor DarkGray
+        }
+
         Write-Host "`nFILE INFORMATION:" -ForegroundColor Yellow
         Write-Host "  Content Length: $contentLength characters" -ForegroundColor White
         Write-Host "  Approx. Size: $([math]::Round($contentLength / 1024, 2)) KB" -ForegroundColor White
         Write-Host "  Lines: $($lines.Count)" -ForegroundColor White
-        Write-Log "Sitemap.xml comprehensive analysis completed: $contentLength characters"
+        
+        Write-Log "Sitemap.xml analysis completed: $contentLength characters, $($urls.Count) URLs found" "INFO"
         
     } catch {
         Write-Host "`n  sitemap.xml not found or inaccessible." -ForegroundColor Red
+        Write-Host "  Error: $($_.Exception.Message)" -ForegroundColor DarkRed
         Write-Log "Sitemap.xml not found: $($_.Exception.Message)" "WARNING"
     }
 }
@@ -1708,7 +1840,6 @@ function Set-ScansInteractive {
                 continue
             }
             'T' {
-                # 🕵️‍♂️ STEALTH MODE - Novo preset furtivo
                 for ($i = 0; $i -lt $scans.Count; $i++) {
                     $scans[$i].Enabled = 0
                 }
@@ -1773,7 +1904,7 @@ function Set-FuzzingRecursive {
         Write-Host "(" -NoNewline -ForegroundColor White
         Write-Host "Configured" -NoNewline -ForegroundColor Cyan
         Write-Host ")" -NoNewline -ForegroundColor White
-        Write-Host " Max Depth: " -NoNewline -ForegroundColor Gray
+        Write-Host " Max Depth:            " -NoNewline -ForegroundColor Gray
     
         if ($global:FuzzingMaxDepth -ge 1 -and $global:FuzzingMaxDepth -le 2) {
             Write-Host "$($global:FuzzingMaxDepth)" -ForegroundColor Yellow
@@ -1793,32 +1924,32 @@ function Set-FuzzingRecursive {
         Write-Host "(" -NoNewline -ForegroundColor White
         Write-Host "Configured" -NoNewline -ForegroundColor Cyan
         Write-Host ")" -NoNewline -ForegroundColor White
-        Write-Host " Timeout (ms): " -NoNewline -ForegroundColor Gray
+        Write-Host " Timeout (ms):       " -NoNewline -ForegroundColor Gray
 
         if ($global:FuzzingTimeoutMs -ge 500 -and $global:FuzzingTimeoutMs -le 1000) {
-            Write-Host "$($global:FuzzingTimeoutMs)" -ForegroundColor DarkRed  # Muito rápido = Alto risco
+            Write-Host "$($global:FuzzingTimeoutMs)ms" -ForegroundColor DarkRed  # Muito rápido = Alto risco
         } elseif ($global:FuzzingTimeoutMs -ge 1001 -and $global:FuzzingTimeoutMs -le 2000) {
-            Write-Host "$($global:FuzzingTimeoutMs)" -ForegroundColor Red      # Rápido = Risco moderado
+            Write-Host "$($global:FuzzingTimeoutMs)ms" -ForegroundColor Red      # Rápido = Risco moderado
         } elseif ($global:FuzzingTimeoutMs -ge 2001 -and $global:FuzzingTimeoutMs -le 5000) {
-            Write-Host "$($global:FuzzingTimeoutMs)" -ForegroundColor Yellow   # Moderado = Risco baixo
+            Write-Host "$($global:FuzzingTimeoutMs)ms" -ForegroundColor Yellow   # Moderado = Risco baixo
         } elseif ($global:FuzzingTimeoutMs -ge 5001 -and $global:FuzzingTimeoutMs -le 30000) {
-            Write-Host "$($global:FuzzingTimeoutMs)" -ForegroundColor Green    # Lento = Baixo risco
+            Write-Host "$($global:FuzzingTimeoutMs)ms" -ForegroundColor Green    # Lento = Baixo risco
         } else {
-            Write-Host "$($global:FuzzingTimeoutMs)" -ForegroundColor Gray
+            Write-Host "$($global:FuzzingTimeoutMs)ms" -ForegroundColor Gray
         }
 
         Write-Host "                                                                          " -NoNewline
         Write-Host "(" -NoNewline -ForegroundColor White
         Write-Host "Configured" -NoNewline -ForegroundColor Cyan
         Write-Host ")" -NoNewline -ForegroundColor White
-        Write-Host " Max Threads: " -NoNewline -ForegroundColor Gray
+        Write-Host " Max Threads:          " -NoNewline -ForegroundColor Gray
         write-Host "$($global:FuzzingMaxThreads)" -ForegroundColor Magenta
 
         Write-Host "                                                                          " -NoNewline
         Write-Host "(" -NoNewline -ForegroundColor White
         Write-Host "Configured" -NoNewline -ForegroundColor Cyan
         Write-Host ")" -NoNewline -ForegroundColor White
-        Write-Host " Aggressive Mode: " -NoNewline -ForegroundColor Gray
+        Write-Host " Aggressive Mode:   " -NoNewline -ForegroundColor Gray
         Write-Host "$(if ($global:FuzzingAggressive) { 'ENABLED' } else { 'DISABLED' })" -ForegroundColor $(if ($global:FuzzingAggressive) { "Green" } else { "Red" }) 
 
         Write-Host "                                                                          " -NoNewline
@@ -2079,16 +2210,13 @@ function Get-PageSignature {
     try {
         Write-Log "Getting page signature for: $Url" "DEBUG"
         
-        #  CORREÇÃO COMPLETA: CONFIGURAÇÃO SIMPLIFICADA E SEGURA
         $request = [System.Net.WebRequest]::Create($Url)
         $request.Timeout = 15000
         $request.Method = "GET"
         
-        #  APENAS HEADERS COMPATÍVEIS - SEM ERROS
         $request.UserAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
         $request.Accept = "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"
         
-        #  HEADERS SEGUROS QUE FUNCIONAM COM .Add()
         $request.Headers.Add("Accept-Language", "en-US,en;q=0.5")
         
         Write-Log "Request configured safely for: $Url" "DEBUG"
@@ -2971,18 +3099,18 @@ function Start-FuzzingRecursive {
         Write-Log "URL base configurada: $baseUrl" "INFO"
         Write-Log "Host: $baseHost" "INFO"
         
-        Write-Host "`n[CONFIG]" -ForegroundColor Cyan
+        Write-Host "`n[CONFIGURATION STATUS]" -ForegroundColor Cyan
         
         Write-Host "  " -NoNewline
         Write-Host "(" -NoNewline -ForegroundColor White
-        Write-Host "Config" -NoNewline -ForegroundColor Green
+        Write-Host "Status" -NoNewline -ForegroundColor Magenta
         Write-Host ")" -NoNewline -ForegroundColor White
         Write-Host " Words: " -NoNewline -ForegroundColor Gray
         Write-Host "$($words.Count)" -ForegroundColor DarkRed
 
         Write-Host "  " -NoNewline
         Write-Host "(" -NoNewline -ForegroundColor White
-        Write-Host "Config" -NoNewline -ForegroundColor Green
+        Write-Host "Config" -NoNewline -ForegroundColor Magenta
         Write-Host ")" -NoNewline -ForegroundColor White
         Write-Host " Max Depth: " -NoNewline -ForegroundColor Gray
 
@@ -3002,7 +3130,7 @@ function Start-FuzzingRecursive {
 
         Write-Host "  " -NoNewline
         Write-Host "(" -NoNewline -ForegroundColor White
-        Write-Host "Config" -NoNewline -ForegroundColor Green
+        Write-Host "Config" -NoNewline -ForegroundColor Magenta
         Write-Host ")" -NoNewline -ForegroundColor White
         Write-Host " Timeout (ms): " -NoNewline -ForegroundColor Gray
         
@@ -3020,21 +3148,21 @@ function Start-FuzzingRecursive {
 
         Write-Host "  " -NoNewline
         Write-Host "(" -NoNewline -ForegroundColor White
-        Write-Host "Config" -NoNewline -ForegroundColor Green
+        Write-Host "Config" -NoNewline -ForegroundColor Magenta
         Write-Host ")" -NoNewline -ForegroundColor White
         Write-Host " Max Threads: " -NoNewline -ForegroundColor Gray
-        Write-Host "$($MaxThreads)" -ForegroundColor Magenta
+        Write-Host "$($MaxThreads)" -ForegroundColor Yellow
 
         Write-Host "  " -NoNewline
         Write-Host "(" -NoNewline -ForegroundColor White
-        Write-Host "Config" -NoNewline -ForegroundColor Green
+        Write-Host "Status" -NoNewline -ForegroundColor Magenta
         Write-Host ")" -NoNewline -ForegroundColor White
         Write-Host " Aggressive Mode: " -NoNewline -ForegroundColor Gray
         Write-Host "$(if ($Aggressive) { 'ENABLED' } else { 'DISABLED' })" -ForegroundColor $(if ($Aggressive) { "Green" } else { "Red" })
 
         Write-Host "  " -NoNewline
         Write-Host "(" -NoNewline -ForegroundColor White
-        Write-Host "Config" -NoNewline -ForegroundColor Green
+        Write-Host "Status" -NoNewline -ForegroundColor Magenta
         Write-Host ")" -NoNewline -ForegroundColor White
         Write-Host " Subdomain Fuzzing: " -NoNewline -ForegroundColor Gray
         Write-Host "$(if ($SubdomainFuzzing) { 'ENABLED' } else { 'DISABLED' })" -ForegroundColor $(if ($SubdomainFuzzing) { "Green" } else { "Red" })
@@ -3093,7 +3221,7 @@ function Start-FuzzingRecursive {
                     # SEU CÓDIGO DE REPORTING ATUAL JÁ É EXCELENTE - MANTENHA!
                     Write-Host "   Subdomains found:" -ForegroundColor Gray
                     foreach ($sub in $foundSubdomains) {
-                        Write-Host "     - $($sub.URL)" -ForegroundColor White
+                        Write-Host "     - $($sub.URL)" -ForegroundColor Yellow
                         
                         # Adicionar informações extras se disponíveis
                         if ($sub.Title -and $sub.Title -ne "No Title") {
@@ -3419,11 +3547,11 @@ function RunAllScans {
             }
             
         } else {
-            Write-Host "Words for Fuzzing: NOT EXECUTED OR FAILED" -ForegroundColor Red
+            Write-Host "Words for Fuzzing: NOT EXECUTED OR FAILED  Active in Submenu (0 , 3 , 14)." -ForegroundColor Red
             Write-Host "Auto Fuzzing skipped - make sure 'Words for Fuzzing' scan is enabled and words were extracted." -ForegroundColor Yellow
         }
     } else {
-        Write-Host "Auto Fuzzing Mode: DISABLED" -ForegroundColor Yellow
+        Write-Host "Auto Fuzzing Mode: DISABLED, Active in Submenu (0 , 4)." -ForegroundColor Red
         Write-Host "No automatic fuzzing will be performed." -ForegroundColor Gray
     }
     
