@@ -45,7 +45,6 @@ function Logo_Menu {
 # =============================================
 $global:PortsForBannerScan = @(21,22,80,443,3306,5432,8080)
 $global:AutoFuzzingMode = 0
-#fuzzing settings
 $global:FuzzingMaxDepth = 1
 $global:FuzzingTimeoutMs = 3000
 $global:FuzzingMaxThreads = 404
@@ -746,6 +745,7 @@ function ScanLinks {
         Write-ErrorWeb -ErrorObject $_
     }
 }
+
 function ScanRobotsTxt {
     param ([string]$url)
     try {
@@ -1950,7 +1950,7 @@ function Set-FuzzingRecursive {
         Write-Host "(" -NoNewline -ForegroundColor White
         Write-Host "Configured" -NoNewline -ForegroundColor Cyan
         Write-Host ")" -NoNewline -ForegroundColor White
-        Write-Host " Aggressive Mode:     " -NoNewline -ForegroundColor Gray
+        Write-Host " Extended Path Scan:  " -NoNewline -ForegroundColor Gray
         Write-Host "$(if ($global:FuzzingAggressive) { 'ENABLED' } else { 'DISABLED' })" -ForegroundColor $(if ($global:FuzzingAggressive) { "Green" } else { "Red" }) 
 
         Write-Host "                                                                          " -NoNewline
@@ -1983,7 +1983,7 @@ function Set-FuzzingRecursive {
         
         Write-Host "                                                                       Press " -NoNewline -ForegroundColor DarkRed
         Write-Host "[4]" -NoNewline -ForegroundColor DarkGreen
-        Write-Host " - Toggle Aggressive Mode" -ForegroundColor Gray
+        Write-Host " - Toggle Extended Path Scan" -ForegroundColor Gray
         
         Write-Host "                                                                       Press " -NoNewline -ForegroundColor DarkRed
         Write-Host "[5]" -NoNewline -ForegroundColor DarkGreen
@@ -2082,8 +2082,8 @@ function Set-FuzzingRecursive {
             '4' {
                 $global:FuzzingAggressive = -not $global:FuzzingAggressive
                 $status = if ($global:FuzzingAggressive) { "ENABLED" } else { "DISABLED" }
-                Write-Host "`n                    Aggressive Mode: $status" -ForegroundColor $(if ($global:FuzzingAggressive) { "Green" } else { "Red" })
-                Write-Host "                    Note: Aggressive mode increases speed but may trigger WAF/IDS" -ForegroundColor Yellow
+                Write-Host "`n                    Extended Path Scan: $status" -ForegroundColor $(if ($global:FuzzingAggressive) { "Green" } else { "Red" })
+                Write-Host "                    Note: Extended Path Scan increases speed but may trigger WAF/IDS" -ForegroundColor Yellow
                 Start-Sleep -Seconds 1
                 continue
             }
@@ -3067,7 +3067,7 @@ function Invoke-SmartRecursion {
     }
 }
 # =============================================
-# FUNÇÃO AGGRESSIVE MODE 
+# extra path 
 # DETECÇÃO INTELIGENTE DE TECNOLOGIA E ATAQUES ESPECÍFICOS
 # =============================================
 
@@ -3083,11 +3083,12 @@ function Invoke-IntelligentDetection {
     )
     
     # mesangem agressive mode on 
-    Write-Host "`n[AGGRESSIVE MODE] Activated for target: $Url" -ForegroundColor Red
+    Write-Host "`n`n     [Extended Path Scan] Activated for target: $Url" -ForegroundColor Magenta
 
+    Write-Host "   Starting comprehensive path scan..." FooregroundColor Yellow
     Write-Host "`n[INTELLIGENT DETECTION] Starting technology analysis..." -ForegroundColor Red
-    Write-Host "   Target: $Url" -ForegroundColor White
-    Write-Host "   Mode: SMART TECHNOLOGY DETECTION" -ForegroundColor Red
+    Write-Host "         Target: $Url" -ForegroundColor White
+    Write-Host "         Mode: SMART TECHNOLOGY DETECTION" -ForegroundColor Red
     
     Write-Log "INTELLIGENT DETECTION MODE activated for: $Url" "INFO"
     
@@ -3103,31 +3104,31 @@ function Invoke-IntelligentDetection {
         "Laravel" {
             Write-Host "`n[LARAVEL ATTACK] Launching Laravel-specific penetration..." -ForegroundColor Red
             #Invoke-LaravelPenetration -Url $Url -Session $Session
-            Invoke-GenericAggressiveScan -Url $Url -Session $Session
+            Invoke-Generic_Paths_plus -Url $Url -Session $Session
         }
         "Joomla" {
             Write-Host "`n[JOOMLA ATTACK] Launching Joomla-specific penetration..." -ForegroundColor Red
             #Invoke-JoomlaPenetration -Url $Url -Session $Session
-            Invoke-GenericAggressiveScan -Url $Url -Session $Session
+            Invoke-Generic_Paths_plus -Url $Url -Session $Session
         }
         "Drupal" {
             Write-Host "`n[DRUPAL ATTACK] Launching Drupal-specific penetration..." -ForegroundColor Red
             #Invoke-DrupalPenetration -Url $Url -Session $Session
-            Invoke-GenericAggressiveScan -Url $Url -Session $Session
+            Invoke-Generic_Paths_plus -Url $Url -Session $Session
         }
         "Apache" {
             Write-Host "`n[APACHE ATTACK] Launching Apache server penetration..." -ForegroundColor Red
             #Invoke-ApachePenetration -Url $Url -Session $Session
-            Invoke-GenericAggressiveScan -Url $Url -Session $Session
+            Invoke-Generic_Paths_plus -Url $Url -Session $Session
         }
         "Nginx" {
             Write-Host "`n[NGINX ATTACK] Launching Nginx server penetration..." -ForegroundColor Red
             #Invoke-NginxPenetration -Url $Url -Session $Session
-            Invoke-GenericAggressiveScan -Url $Url -Session $Session
+            Invoke-Generic_Paths_plus -Url $Url -Session $Session
         }
         default {
             Write-Host "`n[GENERIC ATTACK] No specific technology detected, using aggressive generic scan..." -ForegroundColor Yellow
-            Invoke-GenericAggressiveScan -Url $Url -Session $Session
+            Invoke-Generic_Paths_plus -Url $Url -Session $Session
         }
     }
     
@@ -3140,7 +3141,7 @@ function Invoke-TechnologyDetection {
         [object]$Session
     )
     
-    Write-Host "`n[TECH DETECTION] Analyzing target technology..." -ForegroundColor Red
+    Write-Host "`n   [TECH DETECTION] Analyzing target technology..." -ForegroundColor Red
     
     $techSignatures = @(
         @{ Technology = "WordPress"; Paths = @("/wp-admin/", "/wp-content/", "/wp-includes/", "/wp-json/", "/xmlrpc.php"); Keywords = @("WordPress", "wp-") }
@@ -3240,9 +3241,9 @@ function Invoke-TechnologyDetection {
     }
     
     # RESULTADO DA DETECÇÃO
-    Write-Host "   Detected: $($detectedTech.Technology)" -ForegroundColor $(if ($detectedTech.Technology -ne "Unknown") { "Green" } else { "Yellow" })
-    Write-Host "   Version: $($detectedTech.Version)" -ForegroundColor White
-    Write-Host "   Confidence: $([math]::Round($detectedTech.Confidence, 1))%" -ForegroundColor $(if ($detectedTech.Confidence -gt 70) { "Green" } elseif ($detectedTech.Confidence -gt 40) { "Yellow" } else { "Red" })
+    Write-Host "     Detected: $($detectedTech.Technology)" -ForegroundColor $(if ($detectedTech.Technology -ne "Unknown") { "Green" } else { "Yellow" })
+    Write-Host "     Version: $($detectedTech.Version)" -ForegroundColor White
+    Write-Host "     Confidence: $([math]::Round($detectedTech.Confidence, 1))%" -ForegroundColor $(if ($detectedTech.Confidence -gt 70) { "Green" } elseif ($detectedTech.Confidence -gt 40) { "Yellow" } else { "Red" })
     
     return $detectedTech
 }
@@ -3262,270 +3263,65 @@ function Invoke-WordPressPenetration {
     
     # WORDLIST 
     $wpAttackPaths = @(
-        # ==================== CONFIGURAÇÕES CRÍTICAS ====================
-        "/wp-config.php", "/wp-config.php.bak", "/wp-config.php.old", "/wp-config.php.save",
-        "/wp-config.php.backup", "/wp-config.php.tmp", "/wp-config.php.orig", "/wp-config.php.original",
-        "/wp-config.php.dist", "/wp-config.php.example", "/wp-config.php.sample", "/wp-config.php.default",
-        "/wp-config.php.dev", "/wp-config.php.prod", "/wp-config.php.production", "/wp-config.php.local",
-        "/wp-config.php.test", "/wp-config.php.staging", "/wp-config.php.demo", "/wp-config.php.back",
-        "/wp-config.php.prev", "/wp-config.php.previous", "/wp-config.php.1", "/wp-config.php.2",
-        "/wp-config.php.2024", "/wp-config.php.2023", "/wp-config.php.2022", "/wp-config.php.bak1",
-        "/wp-config.php.bak2", "/wp-config.php.bk", "/wp-config.php.bkp", "/wp-config.php.backup1",
-        "/wp-config.php.backup2", "/wp-config.php.old1", "/wp-config.php.old2", "/wp-config.php.save1",
-        "/wp-config.php.save2", "/wp-config.php.temp", "/wp-config.php.temporary", "/wp-config.php.swp",
-        "/wp-config.php.swo", "/wp-config.php.swn", "/wp-config.php~", "/wp-config.php#", "/wp-config.php#backup#",
-        
-        # ==================== BACKUPS DE BANCO ====================
-        "/wp-content/backup.sql", "/wp-content/database.sql", "/wp-content/db.sql", "/wp-content/data.sql",
-        "/wp-content/backup.sql.gz", "/wp-content/database.sql.gz", "/wp-content/backup.sql.zip",
-        "/wp-content/database.sql.zip", "/wp-content/backup.sql.tar.gz", "/wp-content/database.sql.tar.gz",
-        "/wp-content/backup.sql.7z", "/wp-content/dump.sql", "/wp-content/mysql.sql", "/wp-content/sqlbackup.sql",
-        "/wp-content/backup.sql.bak", "/wp-content/database.sql.bak", "/wp-content/backup.sql.old",
-        "/wp-content/database.sql.old", "/wp-content/backup.sql.save", "/wp-content/database.sql.save",
-        "/wp-content/backup_2024.sql", "/wp-content/backup_2023.sql", "/wp-content/backup_2022.sql",
-        "/wp-content/db_backup.sql", "/wp-content/db_dump.sql", "/wp-content/mysql_dump.sql",
-        "/wp-content/wp_backup.sql", "/wp-content/wordpress_backup.sql", "/wp-content/site_backup.sql",
-        "/wp-content/full_backup.sql", "/wp-content/complete_backup.sql", "/wp-content/latest.sql",
-        "/wp-content/backup-latest.sql", "/wp-content/db-latest.sql",
-        
-        # ==================== ARQUIVOS DE BACKUP ====================
-        "/wp-content/backup.zip", "/wp-content/backup.tar", "/wp-content/backup.tar.gz", "/wp-content/backup.7z",
-        "/wp-content/backup.rar", "/wp-content/database.zip", "/wp-content/database.tar.gz", "/wp-content/db.zip",
-        "/wp-content/site.zip", "/wp-content/wordpress.zip", "/wp-content/full-backup.zip", "/wp-content/backup-full.zip",
-        "/wp-content/backup.old.zip", "/wp-content/backup.bak.zip", "/wp-content/backup.tar.bz2", "/wp-content/backup.tgz",
-        
-        # ==================== LOGS E DEBUG ====================
-        "/wp-content/debug.log", "/wp-content/error.log", "/wp-content/php_errorlog", "/wp-content/errors.log",
-        "/wp-content/php_errors.log", "/wp-content/php.log", "/wp-content/debug.log.1", "/wp-content/debug.log.2",
-        "/wp-content/error.log.1", "/wp-content/error.log.2", "/wp-content/debug.log.old", "/wp-content/error.log.old",
-        "/wp-content/debug.log.bak", "/wp-content/error.log.bak", "/wp-content/wp-debug.log", "/wp-content/wordpress.log",
-        "/wp-content/app.log", "/wp-content/application.log", "/wp-content/system.log", "/wp-content/security.log",
-        
-        # ==================== DIRETÓRIOS DE BACKUP ====================
-        "/wp-content/backup/", "/wp-content/backups/", "/wp-content/backup-db/", "/wp-content/db-backup/",
-        "/wp-content/database-backup/", "/wp-content/sql-backup/", "/wp-content/backup-files/", "/wp-content/backup-data/",
-        "/wp-content/backup-2024/", "/wp-content/backup-2023/", "/wp-content/backup-2022/", "/wp-content/backup-2021/",
-        "/wp-content/backup-old/", "/wp-content/old-backup/", "/wp-content/backup-archive/", "/wp-content/archive/",
-        "/wp-content/backups-2024/", "/wp-content/backups-2023/", "/wp-content/db-backups/", "/wp-content/sql-backups/",
-        "/wp-content/backup-latest/", "/wp-content/latest-backup/", "/wp-content/full-backup/", "/wp-content/complete-backup/",
-        
-        # ==================== ADMIN E PAINEL ====================
-        "/wp-admin/", "/wp-admin/admin-ajax.php", "/wp-admin/admin-post.php", "/wp-admin/install.php",
-        "/wp-admin/setup-config.php", "/wp-admin/upgrade.php", "/wp-admin/maint/", "/wp-admin/network/",
-        "/wp-admin/user/", "/wp-admin/profile.php", "/wp-admin/options-general.php", "/wp-admin/plugins.php",
-        "/wp-admin/themes.php", "/wp-admin/users.php", "/wp-admin/tools.php", "/wp-admin/import.php",
-        "/wp-admin/export.php", "/wp-admin/site-health.php", "/wp-admin/update-core.php", "/wp-admin/plugin-install.php",
-        "/wp-admin/theme-install.php", "/wp-admin/media-new.php", "/wp-admin/post-new.php", "/wp-admin/link-add.php",
-        "/wp-admin/nav-menus.php", "/wp-admin/widgets.php", "/wp-admin/customize.php", "/wp-admin/edit.php",
-        "/wp-admin/admin.php", "/wp-admin/index.php", "/wp-admin/credits.php", "/wp-admin/freedoms.php",
-        "/wp-admin/privacy.php",
-        
-        # ==================== WORDPRESS API ====================
-        "/wp-json/", "/wp-json/wp/v2/users", "/wp-json/wp/v2/users/1", "/wp-json/wp/v2/users/2",
-        "/wp-json/wp/v2/posts", "/wp-json/wp/v2/pages", "/wp-json/wp/v2/comments", "/wp-json/wp/v2/taxonomies",
-        "/wp-json/wp/v2/categories", "/wp-json/wp/v2/tags", "/wp-json/wp/v2/media", "/wp-json/wp/v2/types",
-        "/wp-json/wp/v2/statuses", "/wp-json/wp/v2/settings", "/wp-json/wp/v2/themes", "/wp-json/wp/v2/plugins",
-        "/wp-json/wp/v2/blocks", "/wp-json/wp/v2/search", "/wp-json/wp/v2/templates", "/wp-json/wp/v2/global-styles",
-        "/?rest_route=/wp/v2/users", "/?rest_route=/wp/v2/users/1", "/?rest_route=/wp/v2/posts",
-        "/?rest_route=/wp/v2/pages", "/?rest_route=/wp/v2/settings", "/?rest_route=/wp/v2/themes",
-        "/?rest_route=/wp/v2/plugins", "/index.php?rest_route=/wp/v2/users",
-        
-        # ==================== UPLOADS E ARQUIVOS ====================
-        "/wp-content/uploads/", "/wp-content/uploads/../wp-config.php", "/wp-content/uploads/../../wp-config.php",
-        "/wp-content/uploads/../../../wp-config.php", "/wp-content/uploads/backup.sql", "/wp-content/uploads/database.sql",
-        "/wp-content/uploads/backup.zip", "/wp-content/uploads/backup/", "/wp-content/uploads/backups/",
-        "/wp-content/uploads/2024/", "/wp-content/uploads/2023/", "/wp-content/uploads/2022/", "/wp-content/uploads/2021/",
-        "/wp-content/uploads/2020/", "/wp-content/uploads/2019/", "/wp-content/uploads/2018/", "/wp-content/uploads/2017/",
-        "/wp-content/uploads/2016/", "/wp-content/uploads/2015/", "/wp-content/uploads/2014/", "/wp-content/uploads/2013/",
-        "/wp-content/uploads/2012/", "/wp-content/uploads/2011/", "/wp-content/uploads/2010/", "/wp-content/uploads/2009/",
-        "/wp-content/uploads/2008/", "/wp-content/uploads/2007/", "/wp-content/uploads/2006/", "/wp-content/uploads/2005/",
-        
-        # ==================== PLUGINS ====================
-        "/wp-content/plugins/", "/wp-content/plugins/backup/", "/wp-content/plugins/akismet/", "/wp-content/plugins/hello.php",
-        "/wp-content/plugins/contact-form-7/", "/wp-content/plugins/yoast-seo/", "/wp-content/plugins/wordfence/",
-        "/wp-content/plugins/woocommerce/", "/wp-content/plugins/elementor/", "/wp-content/plugins/wpforms/",
-        "/wp-content/plugins/jetpack/", "/wp-content/plugins/gravityforms/", "/wp-content/plugins/all-in-one-seo-pack/",
-        "/wp-content/plugins/redirection/", "/wp-content/plugins/updraftplus/", "/wp-content/plugins/backwpup/",
-        "/wp-content/plugins/duplicator/", "/wp-content/plugins/backupbuddy/", "/wp-content/plugins/wp-migrate-db/",
-        "/wp-content/plugins/advanced-custom-fields/", "/wp-content/plugins/wp-rocket/", "/wp-content/plugins/security/",
-        "/wp-content/plugins/firewall/", "/wp-content/plugins/admin/", "/wp-content/plugins/database/",
-        "/wp-content/plugins/backup-plugin/", "/wp-content/plugins/migration/", "/wp-content/plugins/export/",
-        "/wp-content/plugins/import/", "/wp-content/plugins/debug/", "/wp-content/plugins/log/",
-        "/wp-content/plugins/error/", "/wp-content/plugins/config/", "/wp-content/plugins/settings/",
-        
-        # ==================== TEMAS ====================
-        "/wp-content/themes/", "/wp-content/themes/twentytwentyfour/", "/wp-content/themes/twentytwentythree/",
-        "/wp-content/themes/twentytwentytwo/", "/wp-content/themes/twentytwentyone/", "/wp-content/themes/twentytwenty/",
-        "/wp-content/themes/twentynineteen/", "/wp-content/themes/twentyseventeen/", "/wp-content/themes/twentysixteen/",
-        "/wp-content/themes/twentyfifteen/", "/wp-content/themes/twentyfourteen/", "/wp-content/themes/twentythirteen/",
-        "/wp-content/themes/twentytwelve/", "/wp-content/themes/twentyeleven/", "/wp-content/themes/twentyten/",
-        "/wp-content/themes/astra/", "/wp-content/themes/oceanwp/", "/wp-content/themes/divi/", "/wp-content/themes/avada/",
-        "/wp-content/themes/generatepress/", "/wp-content/themes/neve/", "/wp-content/themes/enfold/", "/wp-content/themes/salient/",
-        "/wp-content/themes/flatsome/", "/wp-content/themes/betheme/", "/wp-content/themes/the7/", "/wp-content/themes/xstore/",
-        "/wp-content/themes/woodmart/", "/wp-content/themes/porto/", "/wp-content/themes/kalium/", "/wp-content/themes/jupiter/",
-        "/wp-content/themes/bridge/", "/wp-content/themes/newspaper/", "/wp-content/themes/schema/", "/wp-content/themes/extra/",
-        
-        # ==================== XML-RPC ====================
-        "/xmlrpc.php", "/xmlrpc.php?debug=1", "/xmlrpc.php?test=1", "/xmlrpc.php?admin=1",
-        "/xmlrpc.php?system.listMethods", "/xmlrpc.php?wp.getUsersBlogs", "/xmlrpc.php?wp.getPosts",
-        "/xmlrpc.php?demo=1", "/xmlrpc.php?backup=1", "/xmlrpc.php?config=1",
-        
-        # ==================== ARQUIVOS DO CORE ====================
-        "/wp-includes/", "/wp-includes/version.php", "/wp-includes/functions.php", "/wp-includes/option.php",
-        "/wp-includes/user.php", "/wp-includes/plugin.php", "/wp-includes/theme.php", "/wp-includes/db.php",
-        "/wp-includes/wp-db.php", "/wp-includes/class-wpdb.php", "/wp-includes/load.php", "/wp-includes/default-constants.php",
-        "/wp-includes/cache.php", "/wp-includes/cron.php", "/wp-includes/rewrite.php", "/wp-includes/query.php",
-        "/wp-includes/link-template.php", "/wp-includes/formatting.php", "/wp-includes/kses.php", "/wp-includes/capabilities.php",
-        "/wp-includes/session.php", "/wp-includes/rest-api/", "/wp-includes/blocks/", "/wp-includes/css/",
-        "/wp-includes/js/", "/wp-includes/images/", "/wp-includes/fonts/", "/wp-includes/SimplePie/",
-        
-        # ==================== ARQUIVOS DE VERSÃO E INFO ====================
-        "/readme.html", "/license.txt", "/wp-config-sample.php", "/wp-load.php", "/wp-cron.php",
-        "/wp-mail.php", "/wp-trackback.php", "/wp-signup.php", "/wp-activate.php", "/wp-blog-header.php",
-        "/wp-links-opml.php", "/wp-settings.php", "/wp-login.php", "/wp-register.php", "/wp-comments-post.php",
-        
-        # ==================== DIRETÓRIOS DO SISTEMA ====================
-        "/wp-content/upgrade/", "/wp-content/languages/", "/wp-content/mu-plugins/", "/wp-content/cache/",
-        "/wp-content/w3tc-config/", "/wp-content/advanced-cache.php", "/wp-content/db.php", "/wp-content/object-cache.php",
-        "/wp-content/.htaccess", "/wp-content/web.config", "/wp-content/robots.txt", "/wp-content/sitemap.xml",
-        "/wp-content/sitemap_index.xml", "/wp-content/crossdomain.xml", "/wp-content/security.txt",
-        
-        # ==================== PATHS DE TRAVERSAL ====================
-        "/wp-content/plugins/../../wp-config.php", "/wp-content/themes/../../wp-config.php",
-        "/wp-content/uploads/../../wp-config.php", "/wp-content/plugins/../../../wp-config.php",
-        "/wp-content/themes/../../../wp-config.php", "/wp-content/uploads/../../../wp-config.php",
-        "/wp-content/plugins/../../../../wp-config.php", "/wp-content/themes/../../../../wp-config.php",
-        "/wp-content/uploads/../../../../wp-config.php", "/wp-content/plugins/../../../../../wp-config.php",
-        "/wp-content/themes/../../../../../wp-config.php", "/wp-content/uploads/../../../../../wp-config.php",
-        
-        # ==================== PATHS ALTERNATIVOS ====================
-        "/.wp-config.php", "/wp-config.php.", "/wp-config.php_", "/_wp-config.php", "/config.wp.php",
-        "/wp-config.php.txt", "/wp-config.php.html", "/wp-config.php.jpg", "/wp-config.php.png",
-        "/wp-config.php.gif", "/wp-config.php.pdf", "/wp-config.php.doc", "/wp-config.php.docx",
-        "/wp-config.php.xls", "/wp-config.php.xlsx", "/wp-config.php.zip", "/wp-config.php.rar",
-        "/wp-config.php.7z", "/wp-config.php.tar", "/wp-config.php.tar.gz", "/wp-config.php.bz2",
-        
-        # ==================== ENV E CONFIGURAÇÕES ====================
-        "/.env", "/.env.local", "/.env.production", "/.env.development", "/.env.test", "/.env.staging",
-        "/.env.demo", "/.env.backup", "/.env.old", "/.env.bak", "/.env.save", "/.env.example",
-        "/.env.sample", "/.env.dist", "/.env.default", "/.env.prod", "/.env.dev", "/.env.live",
-        "/config.php", "/config.php.bak", "/config.php.old", "/configuration.php", "/settings.php",
-        "/secrets.php", "/credentials.php", "/database.php", "/db.php",
-        
-        # ==================== EXPORTS E IMPORTS ====================
-        "/wp-content/export/", "/wp-content/import/", "/wp-content/mysql/", "/wp-content/database/",
-        "/wp-content/sql/", "/wp-content/dumps/", "/wp-content/exports/", "/wp-content/imports/",
-        "/wp-content/transfer/", "/wp-content/migration/", "/wp-content/migrate/", "/wp-content/backup-migration/",
-        
-        # ==================== ARQUIVOS OCULTOS ====================
-        "/wp-content/.backup/", "/wp-content/.backups/", "/wp-content/.database/", "/wp-content/.sql/",
-        "/wp-content/.config/", "/wp-content/.env", "/wp-content/.htpasswd", "/wp-content/.git/",
-        "/wp-content/.svn/", "/wp-content/.hg/", "/wp-content/.bzr/", "/wp-content/.DS_Store",
-        "/wp-content/Thumbs.db", "/wp-content/desktop.ini",
-        
-        # ==================== WORDPRESS MULTISITE ====================
-        "/wp-admin/network/", "/wp-includes/ms-", "/wp-includes/ms-functions.php", "/wp-includes/ms-default-constants.php",
-        "/wp-includes/ms-load.php", "/wp-includes/ms-settings.php", "/wp-includes/ms-deprecated.php",
-        "/wp-includes/ms-files.php", "/wp-includes/ms-blogs.php", "/wp-includes/ms-sites.php"
-        # ==================== NOVOS CAMINHOS CRÍTICOS ====================
-        "/wp-json/wp-site-health/v1/tests", "/wp-json/wp-site-health/v1/tests/background-updates",
-        "/wp-json/wp-site-health/v1/tests/loopback-requests", "/wp-json/wp-site-health/v1/tests/https-status",
-        "/wp-json/wp-site-health/v1/tests/dotorg-communication", "/wp-json/wp-site-health/v1/tests/authorization-header",
-        "/wp-json/wp-site-health/v1/tests/plugin-theme-auto-updates", "/wp-json/wp/v2/block-renderer",
-        "/wp-json/wp/v2/block-types", "/wp-json/wp/v2/global-styles", "/wp-json/wp/v2/pattern-directory",
-        "/wp-json/wp/v2/block-patterns/patterns", "/wp-json/wp/v2/block-directory/search",
+       "/wp-config.php", "/wp-config.php.bak", "/wp-config.php.old", "/wp-config.php.save", "/wp-config.php.backup", "/wp-config.php.tmp", "/wp-config.php.orig", "/wp-config.php.original", "/wp-config.php.dist", "/wp-config.php.example", "/wp-config.php.sample",
+"/wp-config.php.default", "/wp-config.php.dev", "/wp-config.php.prod", "/wp-config.php.production", "/wp-config.php.local", "/wp-config.php.test", "/wp-config.php.staging", "/wp-config.php.demo", "/wp-config.php.back", "/wp-config.php.prev", "/wp-config.php.previous",
+"/wp-config.php.1", "/wp-config.php.2", "/wp-config.php.2024", "/wp-config.php.2023", "/wp-config.php.2022", "/wp-config.php.bak1", "/wp-config.php.bak2", "/wp-config.php.bk", "/wp-config.php.bkp", "/wp-config.php.backup1", "/wp-config.php.backup2",
+"/wp-config.php.old1", "/wp-config.php.old2", "/wp-config.php.save1", "/wp-config.php.save2", "/wp-config.php.temp", "/wp-config.php.temporary", "/wp-config.php.swp", "/wp-config.php.swo", "/wp-config.php.swn", "/wp-config.php~", "/wp-config.php#",
+"/wp-config.php#backup#", "/wp-content/backup.sql", "/wp-content/database.sql", "/wp-content/db.sql", "/wp-content/data.sql", "/wp-content/backup.sql.gz", "/wp-content/database.sql.gz", "/wp-content/backup.sql.zip", "/wp-content/database.sql.zip", "/wp-content/backup.sql.tar.gz", "/wp-content/database.sql.tar.gz",
+"/wp-content/backup.sql.7z", "/wp-content/dump.sql", "/wp-content/mysql.sql", "/wp-content/sqlbackup.sql", "/wp-content/backup.sql.bak", "/wp-content/database.sql.bak", "/wp-content/backup.sql.old", "/wp-content/database.sql.old", "/wp-content/backup.sql.save", "/wp-content/database.sql.save", "/wp-content/backup_2024.sql",
+"/wp-content/backup_2023.sql", "/wp-content/backup_2022.sql", "/wp-content/db_backup.sql", "/wp-content/db_dump.sql", "/wp-content/mysql_dump.sql", "/wp-content/wp_backup.sql", "/wp-content/wordpress_backup.sql", "/wp-content/site_backup.sql", "/wp-content/full_backup.sql", "/wp-content/complete_backup.sql", "/wp-content/latest.sql",
+"/wp-content/backup-latest.sql", "/wp-content/db-latest.sql", "/wp-content/backup.zip", "/wp-content/backup.tar", "/wp-content/backup.tar.gz", "/wp-content/backup.7z", "/wp-content/backup.rar", "/wp-content/database.zip", "/wp-content/database.tar.gz", "/wp-content/db.zip", "/wp-content/site.zip",
+"/wp-content/wordpress.zip", "/wp-content/full-backup.zip", "/wp-content/backup-full.zip", "/wp-content/backup.old.zip", "/wp-content/backup.bak.zip", "/wp-content/backup.tar.bz2", "/wp-content/backup.tgz", "/wp-content/debug.log", "/wp-content/error.log", "/wp-content/php_errorlog", "/wp-content/errors.log",
+"/wp-content/php_errors.log", "/wp-content/php.log", "/wp-content/debug.log.1", "/wp-content/debug.log.2", "/wp-content/error.log.1", "/wp-content/error.log.2", "/wp-content/debug.log.old", "/wp-content/error.log.old", "/wp-content/debug.log.bak", "/wp-content/error.log.bak", "/wp-content/wp-debug.log",
+"/wp-content/wordpress.log", "/wp-content/app.log", "/wp-content/application.log", "/wp-content/system.log", "/wp-content/security.log", "/wp-content/backup/", "/wp-content/backups/", "/wp-content/backup-db/", "/wp-content/db-backup/", "/wp-content/database-backup/", "/wp-content/sql-backup/",
+"/wp-content/backup-files/", "/wp-content/backup-data/", "/wp-content/backup-2024/", "/wp-content/backup-2023/", "/wp-content/backup-2022/", "/wp-content/backup-2021/", "/wp-content/backup-old/", "/wp-content/old-backup/", "/wp-content/backup-archive/", "/wp-content/archive/", "/wp-content/backups-2024/",
+"/wp-content/backups-2023/", "/wp-content/db-backups/", "/wp-content/sql-backups/", "/wp-content/backup-latest/", "/wp-content/latest-backup/", "/wp-content/full-backup/", "/wp-content/complete-backup/", "/wp-admin/", "/wp-admin/admin-ajax.php", "/wp-admin/admin-post.php", "/wp-admin/install.php",
+"/wp-admin/setup-config.php", "/wp-admin/upgrade.php", "/wp-admin/maint/", "/wp-admin/network/", "/wp-admin/user/", "/wp-admin/profile.php", "/wp-admin/options-general.php", "/wp-admin/plugins.php", "/wp-admin/themes.php", "/wp-admin/users.php", "/wp-admin/tools.php",
+"/wp-admin/import.php", "/wp-admin/export.php", "/wp-admin/site-health.php", "/wp-admin/update-core.php", "/wp-admin/plugin-install.php", "/wp-admin/theme-install.php", "/wp-admin/media-new.php", "/wp-admin/post-new.php", "/wp-admin/link-add.php", "/wp-admin/nav-menus.php", "/wp-admin/widgets.php",
+"/wp-admin/customize.php", "/wp-admin/edit.php", "/wp-admin/admin.php", "/wp-admin/index.php", "/wp-admin/credits.php", "/wp-admin/freedoms.php", "/wp-admin/privacy.php", "/wp-json/", "/wp-json/wp/v2/users", "/wp-json/wp/v2/users/1", "/wp-json/wp/v2/users/2",
+"/wp-json/wp/v2/posts", "/wp-json/wp/v2/pages", "/wp-json/wp/v2/comments", "/wp-json/wp/v2/taxonomies", "/wp-json/wp/v2/categories", "/wp-json/wp/v2/tags", "/wp-json/wp/v2/media", "/wp-json/wp/v2/types", "/wp-json/wp/v2/statuses", "/wp-json/wp/v2/settings", "/wp-json/wp/v2/themes",
+"/wp-json/wp/v2/plugins", "/wp-json/wp/v2/blocks", "/wp-json/wp/v2/search", "/wp-json/wp/v2/templates", "/wp-json/wp/v2/global-styles", "/?rest_route=/wp/v2/users", "/?rest_route=/wp/v2/users/1", "/?rest_route=/wp/v2/posts", "/?rest_route=/wp/v2/pages", "/?rest_route=/wp/v2/settings", "/?rest_route=/wp/v2/themes",
+"/?rest_route=/wp/v2/plugins", "/index.php?rest_route=/wp/v2/users", "/wp-content/uploads/", "/wp-content/uploads/../wp-config.php", "/wp-content/uploads/../../wp-config.php", "/wp-content/uploads/../../../wp-config.php", "/wp-content/uploads/backup.sql", "/wp-content/uploads/database.sql", "/wp-content/uploads/backup.zip", "/wp-content/uploads/backup/", "/wp-content/uploads/backups/",
+"/wp-content/uploads/2024/", "/wp-content/uploads/2023/", "/wp-content/uploads/2022/", "/wp-content/uploads/2021/", "/wp-content/uploads/2020/", "/wp-content/uploads/2019/", "/wp-content/uploads/2018/", "/wp-content/uploads/2017/", "/wp-content/uploads/2016/", "/wp-content/uploads/2015/", "/wp-content/uploads/2014/",
+"/wp-content/uploads/2013/", "/wp-content/uploads/2012/", "/wp-content/uploads/2011/", "/wp-content/uploads/2010/", "/wp-content/uploads/2009/", "/wp-content/uploads/2008/", "/wp-content/uploads/2007/", "/wp-content/uploads/2006/", "/wp-content/uploads/2005/", "/wp-content/plugins/",
+"/wp-content/plugins/backup/", "/wp-content/plugins/akismet/", "/wp-content/plugins/hello.php", "/wp-content/plugins/contact-form-7/", "/wp-content/plugins/yoast-seo/", "/wp-content/plugins/wordfence/", "/wp-content/plugins/woocommerce/", "/wp-content/plugins/elementor/", "/wp-content/plugins/wpforms/", "/wp-content/plugins/jetpack/",
+"/wp-content/plugins/gravityforms/", "/wp-content/plugins/all-in-one-seo-pack/", "/wp-content/plugins/redirection/", "/wp-content/plugins/updraftplus/", "/wp-content/plugins/backwpup/", "/wp-content/plugins/duplicator/", "/wp-content/plugins/backupbuddy/", "/wp-content/plugins/wp-migrate-db/", "/wp-content/plugins/advanced-custom-fields/", "/wp-content/plugins/wp-rocket/",
+"/wp-content/plugins/security/", "/wp-content/plugins/firewall/", "/wp-content/plugins/admin/", "/wp-content/plugins/database/", "/wp-content/plugins/backup-plugin/", "/wp-content/plugins/migration/", "/wp-content/plugins/export/", "/wp-content/plugins/import/", "/wp-content/plugins/debug/", "/wp-content/plugins/log/", "/wp-content/plugins/error/",
+"/wp-content/plugins/config/", "/wp-content/plugins/settings/", "/wp-content/themes/", "/wp-content/themes/twentytwentyfour/", "/wp-content/themes/twentytwentythree/", "/wp-content/themes/twentytwentytwo/", "/wp-content/themes/twentytwentyone/", "/wp-content/themes/twentytwenty/", "/wp-content/themes/twentynineteen/", "/wp-content/themes/twentyseventeen/", "/wp-content/themes/twentysixteen/",
+"/wp-content/themes/twentyfifteen/", "/wp-content/themes/twentyfourteen/", "/wp-content/themes/twentythirteen/", "/wp-content/themes/twentytwelve/", "/wp-content/themes/twentyeleven/", "/wp-content/themes/twentyten/", "/wp-content/themes/astra/", "/wp-content/themes/oceanwp/", "/wp-content/themes/divi/", "/wp-content/themes/avada/", "/wp-content/themes/generatepress/",
+"/wp-content/themes/neve/", "/wp-content/themes/enfold/", "/wp-content/themes/salient/", "/wp-content/themes/flatsome/", "/wp-content/themes/betheme/", "/wp-content/themes/the7/", "/wp-content/themes/xstore/", "/wp-content/themes/woodmart/", "/wp-content/themes/porto/", "/wp-content/themes/kalium/", "/wp-content/themes/jupiter/",
+"/wp-content/themes/bridge/", "/wp-content/themes/newspaper/", "/wp-content/themes/schema/", "/wp-content/themes/extra/", "/xmlrpc.php", "/xmlrpc.php?debug=1", "/xmlrpc.php?test=1", "/xmlrpc.php?admin=1", "/xmlrpc.php?system.listMethods", "/xmlrpc.php?wp.getUsersBlogs", "/xmlrpc.php?wp.getPosts",
+"/xmlrpc.php?demo=1", "/xmlrpc.php?backup=1", "/xmlrpc.php?config=1", "/wp-includes/", "/wp-includes/version.php", "/wp-includes/functions.php", "/wp-includes/option.php", "/wp-includes/user.php", "/wp-includes/plugin.php", "/wp-includes/theme.php",
+"/wp-includes/db.php", "/wp-includes/wp-db.php", "/wp-includes/class-wpdb.php", "/wp-includes/load.php", "/wp-includes/default-constants.php", "/wp-includes/cache.php", "/wp-includes/cron.php", "/wp-includes/rewrite.php", "/wp-includes/query.php", "/wp-includes/link-template.php", "/wp-includes/formatting.php",
+"/wp-includes/kses.php", "/wp-includes/capabilities.php", "/wp-includes/session.php", "/wp-includes/rest-api/", "/wp-includes/blocks/", "/wp-includes/css/", "/wp-includes/js/", "/wp-includes/images/", "/wp-includes/fonts/", "/wp-includes/SimplePie/", "/readme.html",
+"/license.txt", "/wp-config-sample.php", "/wp-load.php", "/wp-cron.php", "/wp-mail.php", "/wp-trackback.php", "/wp-signup.php", "/wp-activate.php", "/wp-blog-header.php", "/wp-links-opml.php", "/wp-settings.php",
+"/wp-login.php", "/wp-register.php", "/wp-comments-post.php", "/wp-content/upgrade/", "/wp-content/languages/", "/wp-content/mu-plugins/", "/wp-content/cache/", "/wp-content/w3tc-config/", "/wp-content/advanced-cache.php", "/wp-content/db.php", "/wp-content/object-cache.php",
+"/wp-content/.htaccess", "/wp-content/web.config", "/wp-content/robots.txt", "/wp-content/sitemap.xml", "/wp-content/sitemap_index.xml", "/wp-content/crossdomain.xml", "/wp-content/security.txt", "/wp-content/plugins/../../wp-config.php", "/wp-content/themes/../../wp-config.php", "/wp-content/uploads/../../wp-config.php", "/wp-content/plugins/../../../wp-config.php",
+"/wp-content/themes/../../../wp-config.php", "/wp-content/uploads/../../../wp-config.php", "/wp-content/plugins/../../../../wp-config.php", "/wp-content/themes/../../../../wp-config.php", "/wp-content/uploads/../../../../wp-config.php", "/wp-content/plugins/../../../../../wp-config.php", "/wp-content/themes/../../../../../wp-config.php", "/wp-content/uploads/../../../../../wp-config.php", "/.wp-config.php", "/wp-config.php.", "/wp-config.php_",
+"/_wp-config.php", "/config.wp.php", "/wp-config.php.txt", "/wp-config.php.html", "/wp-config.php.jpg", "/wp-config.php.png", "/wp-config.php.gif", "/wp-config.php.pdf", "/wp-config.php.doc", "/wp-config.php.docx", "/wp-config.php.xls",
+"/wp-config.php.xlsx", "/wp-config.php.zip", "/wp-config.php.rar", "/wp-config.php.7z", "/wp-config.php.tar", "/wp-config.php.tar.gz", "/wp-config.php.bz2", "/.env", "/.env.local", "/.env.production", "/.env.development",
+"/.env.test", "/.env.staging", "/.env.demo", "/.env.backup", "/.env.old", "/.env.bak", "/.env.save", "/.env.example", "/.env.sample", "/.env.dist", "/.env.default",
+"/.env.prod", "/.env.dev", "/.env.live", "/config.php", "/config.php.bak", "/config.php.old", "/configuration.php", "/settings.php", "/secrets.php", "/credentials.php", "/database.php",
+"/db.php", "/wp-content/export/", "/wp-content/import/", "/wp-content/mysql/", "/wp-content/database/", "/wp-content/sql/", "/wp-content/dumps/", "/wp-content/exports/", "/wp-content/imports/", "/wp-content/transfer/", "/wp-content/migration/",
+"/wp-content/migrate/", "/wp-content/backup-migration/", "/wp-content/.backup/", "/wp-content/.backups/", "/wp-content/.database/", "/wp-content/.sql/", "/wp-content/.config/", "/wp-content/.env", "/wp-content/.htpasswd", "/wp-content/.git/", "/wp-content/.svn/",
+"/wp-content/.hg/", "/wp-content/.bzr/", "/wp-content/.DS_Store", "/wp-content/Thumbs.db", "/wp-content/desktop.ini", "/wp-admin/network/", "/wp-includes/ms-", "/wp-includes/ms-functions.php", "/wp-includes/ms-default-constants.php", "/wp-includes/ms-load.php",
+"/wp-includes/ms-settings.php", "/wp-includes/ms-deprecated.php", "/wp-includes/ms-files.php", "/wp-includes/ms-blogs.php", "/wp-includes/ms-sites.php", "/wp-json/wp-site-health/v1/tests", "/wp-json/wp-site-health/v1/tests/background-updates", "/wp-json/wp-site-health/v1/tests/loopback-requests", "/wp-json/wp-site-health/v1/tests/https-status", "/wp-json/wp-site-health/v1/tests/dotorg-communication", "/wp-json/wp-site-health/v1/tests/authorization-header",
+"/wp-json/wp-site-health/v1/tests/plugin-theme-auto-updates", "/wp-json/wp/v2/block-renderer", "/wp-json/wp/v2/block-types", "/wp-json/wp/v2/global-styles", "/wp-json/wp/v2/pattern-directory", "/wp-json/wp/v2/block-patterns/patterns", "/wp-json/wp/v2/block-directory/search", "/wp-content/mysql-backup.sql", "/wp-content/wp-database.sql", "/wp-content/site-dump.sql", "/wp-content/backup-mysql.sql",
+"/wp-content/db-backup-latest.sql", "/wp-content/auto-backup.sql", "/wp-content/daily-backup.sql", "/wp-content/weekly-backup.sql", "/wp-content/monthly-backup.sql", "/wp-content/backup-2025.sql", "/wp-content/logs/", "/wp-content/logs/error.log", "/wp-content/logs/debug.log", "/wp-content/logs/access.log", "/wp-content/logs/security.log",
+"/wp-content/cache/error.log", "/wp-content/cache/debug.log", "/wp-config.local.php", "/wp-config.staging.php", "/wp-config.dev.php", "/wp-config.prod.php", "/wp-config.test.php", "/wp-config.demo.php", "/wp-config.live.php", "/wp-config.preprod.php", "/.wp-config.php.swp",
+"/.wp-config.php.swo", "/wp-config.php.bak2024", "/wp-config.php.bak2025", "/wp-config.php.backup-2024", "/wp-config.php.backup-2025", "/wp-config.php.autosave", "/wp-json/oembed/1.0/embed", "/wp-json/oembed/1.0/proxy", "/wp-json/wp/v2/settings", "/wp-json/wp/v2/taxonomies/category", "/wp-json/wp/v2/taxonomies/post_tag",
+"/wp-json/wp/v2/taxonomies/post_format", "/wp-json/wp/v2/users/me", "/wp-json/wp/v2/users/?per_page=100", "/wp-json/wp/v2/posts/?per_page=100", "/wp-json/wp/v2/pages/?per_page=100", "/wp-json/wp/v2/comments/?per_page=100", "/wp-json/wp/v2/media/?per_page=100", "/wp-content/plugins/wordfence/waf/", "/wp-content/plugins/wordfence/wordfence.php", "/wp-content/plugins/yoast-seo/inc/", "/wp-content/plugins/yoast-seo/yoast-seo.php",
+"/wp-content/plugins/contact-form-7/includes/", "/wp-content/plugins/contact-form-7/wp-contact-form-7.php", "/wp-content/plugins/woocommerce/woocommerce.php", "/wp-content/plugins/woocommerce/includes/", "/wp-content/plugins/elementor/elementor.php", "/wp-content/plugins/elementor/includes/", "/wp-content/plugins/wpforms/wpforms.php", "/wp-content/plugins/wpforms/includes/", "/wp-content/plugins/jetpack/jetpack.php", "/wp-content/plugins/jetpack/_inc/", "/wp-content/plugins/akismet/akismet.php",
+"/wp-content/plugins/akismet/class.akismet.php", "/wp-content/themes/twentytwentyfive/", "/wp-content/themes/twentytwentyfive/style.css", "/wp-content/themes/twentytwentyfive/index.php", "/wp-content/themes/twentytwentyfive/functions.php", "/wp-content/uploads/.htaccess", "/wp-content/uploads/web.config", "/wp-content/uploads/wp-config.php", "/wp-content/uploads/backup/backup.sql", "/wp-content/uploads/backup/database.sql", "/wp-content/uploads/backup/db.sql",
+"/wp-content/cache/wp-rocket/", "/wp-content/cache/w3tc/", "/wp-content/cache/supercache/", "/wp-content/cache/object/", "/wp-content/cache/db/", "/wp-content/cache/min/", "/wp-content/cache/page/", "/wp-content/cache/asset/", "/wp-content/cache/blade/", "/wp-content/error_log", "/wp-content/php_errors.log",
+"/wp-content/php-fpm.log", "/wp-content/nginx-error.log", "/wp-content/apache-error.log", "/wp-content/cpanel-logs/", "/wp-content/plesk-logs/", "/wp-content/whm-logs/", "/wp-content/migrate/", "/wp-content/migrate/backup.sql", "/wp-content/migrate/database.sql", "/wp-content/migrate/site.zip", "/wp-content/migrate/backup.zip",
+"/wp-content/transfer/backup.sql", "/wp-content/transfer/database.sql", "/wp-content/transfer/site.zip", "/wp-content/security/", "/wp-content/security/backup.sql", "/wp-content/security/logs/", "/wp-content/firewall/", "/wp-content/firewall/logs/", "/wp-content/antivirus/", "/wp-content/malware/", "/wp-content/scanner/",
+"/wp-admin/network/admin.php", "/wp-admin/network/update-core.php", "/wp-admin/network/plugins.php", "/wp-admin/network/themes.php", "/wp-admin/network/users.php", "/wp-admin/network/settings.php", "/wp-admin/network/site-new.php", "/wp-admin/network/site-info.php", "/wp-admin/network/site-settings.php", "/wp-admin/network/site-themes.php", "/wp-admin/network/site-users.php",
+"/wp-admin/install.php?step=1", "/wp-admin/install.php?step=2", "/wp-admin/setup-config.php?step=1", "/wp-admin/setup-config.php?step=2", "/wp-admin/setup-config.php?step=3", "/xmlrpc.php?rsd", "/xmlrpc.php?wlw", "/xmlrpc.php?mt", "/xmlrpc.php?blogger", "/xmlrpc.php?metaWeblog", "/xmlrpc.php?demo",
+"/xmlrpc.php?test", "/wp-includes/ms-default-filters.php", "/wp-includes/ms-constants.php", "/wp-includes/ms-functions.php", "/wp-includes/ms-default-constants.php", "/wp-includes/ms-load.php", "/wp-includes/ms-settings.php", "/wp-includes/ms-deprecated.php", "/wp-includes/ms-files.php", "/wp-includes/ms-blogs.php", "/wp-includes/ms-sites.php",
+"/wp-content/.mysql/", "/wp-content/.backup-db/", "/wp-content/.sql-backup/", "/wp-content/.database-backup/", "/wp-content/.site-backup/", "/wp-content/.wp-backup/", "/wp-content/.backup-2024/", "/wp-content/.backup-2025/", "/wp-content/.temp/", "/wp-content/.tmp/", "/wp-content/.cache/",
+"/wp-content/.logs/", "/wp-json/wp-block-editor/v1/url-details", "/wp-json/wp-block-editor/v1/export", "/wp-json/wp/v2/block-patterns/categories", "/wp-json/wp/v2/font-families", "/wp-json/wp/v2/font-faces", "/wp-json/wp/v2/templates/lookup", "/wp-json/wp/v2/template-parts/lookup"
 
-        # ==================== NOVOS BACKUPS E LOGS ====================
-        "/wp-content/mysql-backup.sql", "/wp-content/wp-database.sql", "/wp-content/site-dump.sql",
-        "/wp-content/backup-mysql.sql", "/wp-content/db-backup-latest.sql", "/wp-content/auto-backup.sql",
-        "/wp-content/daily-backup.sql", "/wp-content/weekly-backup.sql", "/wp-content/monthly-backup.sql",
-        "/wp-content/backup-2025.sql", "/wp-content/logs/", "/wp-content/logs/error.log",
-        "/wp-content/logs/debug.log", "/wp-content/logs/access.log", "/wp-content/logs/security.log",
-        "/wp-content/cache/error.log", "/wp-content/cache/debug.log",
-
-        # ==================== NOVOS ARQUIVOS DE CONFIGURAÇÃO ====================
-        "/wp-config.local.php", "/wp-config.staging.php", "/wp-config.dev.php", "/wp-config.prod.php",
-        "/wp-config.test.php", "/wp-config.demo.php", "/wp-config.live.php", "/wp-config.preprod.php",
-        "/.wp-config.php.swp", "/.wp-config.php.swo", "/wp-config.php.bak2024", "/wp-config.php.bak2025",
-        "/wp-config.php.backup-2024", "/wp-config.php.backup-2025", "/wp-config.php.autosave",
-
-        # ==================== NOVOS ENDPOINTS API ====================
-        "/wp-json/oembed/1.0/embed", "/wp-json/oembed/1.0/proxy", "/wp-json/wp/v2/settings",
-        "/wp-json/wp/v2/taxonomies/category", "/wp-json/wp/v2/taxonomies/post_tag",
-        "/wp-json/wp/v2/taxonomies/post_format", "/wp-json/wp/v2/users/me", "/wp-json/wp/v2/users/?per_page=100",
-        "/wp-json/wp/v2/posts/?per_page=100", "/wp-json/wp/v2/pages/?per_page=100",
-        "/wp-json/wp/v2/comments/?per_page=100", "/wp-json/wp/v2/media/?per_page=100",
-
-        # ==================== NOVOS CAMINHOS DE PLUGINS POPULARES ====================
-        "/wp-content/plugins/wordfence/waf/", "/wp-content/plugins/wordfence/wordfence.php",
-        "/wp-content/plugins/yoast-seo/inc/", "/wp-content/plugins/yoast-seo/yoast-seo.php",
-        "/wp-content/plugins/contact-form-7/includes/", "/wp-content/plugins/contact-form-7/wp-contact-form-7.php",
-        "/wp-content/plugins/woocommerce/woocommerce.php", "/wp-content/plugins/woocommerce/includes/",
-        "/wp-content/plugins/elementor/elementor.php", "/wp-content/plugins/elementor/includes/",
-        "/wp-content/plugins/wpforms/wpforms.php", "/wp-content/plugins/wpforms/includes/",
-        "/wp-content/plugins/jetpack/jetpack.php", "/wp-content/plugins/jetpack/_inc/",
-        "/wp-content/plugins/akismet/akismet.php", "/wp-content/plugins/akismet/class.akismet.php",
-
-        # ==================== NOVOS CAMINHOS DE TEMAS ====================
-        "/wp-content/themes/twentytwentyfive/", "/wp-content/themes/twentytwentyfive/style.css",
-        "/wp-content/themes/twentytwentyfive/index.php", "/wp-content/themes/twentytwentyfive/functions.php",
-
-        # ==================== NOVOS CAMINHOS DE UPLOAD ====================
-        "/wp-content/uploads/.htaccess", "/wp-content/uploads/web.config",
-        "/wp-content/uploads/wp-config.php", "/wp-content/uploads/backup/backup.sql",
-        "/wp-content/uploads/backup/database.sql", "/wp-content/uploads/backup/db.sql",
-
-        # ==================== NOVOS CAMINHOS DE CACHE ====================
-        "/wp-content/cache/wp-rocket/", "/wp-content/cache/w3tc/", "/wp-content/cache/supercache/",
-        "/wp-content/cache/object/", "/wp-content/cache/db/", "/wp-content/cache/min/",
-        "/wp-content/cache/page/", "/wp-content/cache/asset/", "/wp-content/cache/blade/",
-
-        # ==================== NOVOS CAMINHOS DE DEBUG ====================
-        "/wp-content/error_log", "/wp-content/php_errors.log", "/wp-content/php-fpm.log",
-        "/wp-content/nginx-error.log", "/wp-content/apache-error.log", "/wp-content/cpanel-logs/",
-        "/wp-content/plesk-logs/", "/wp-content/whm-logs/",
-
-        # ==================== NOVOS CAMINHOS DE MIGRAÇÃO ====================
-        "/wp-content/migrate/", "/wp-content/migrate/backup.sql", "/wp-content/migrate/database.sql",
-        "/wp-content/migrate/site.zip", "/wp-content/migrate/backup.zip", "/wp-content/transfer/backup.sql",
-        "/wp-content/transfer/database.sql", "/wp-content/transfer/site.zip",
-
-        # ==================== NOVOS CAMINHOS DE SEGURANÇA ====================
-        "/wp-content/security/", "/wp-content/security/backup.sql", "/wp-content/security/logs/",
-        "/wp-content/firewall/", "/wp-content/firewall/logs/", "/wp-content/antivirus/",
-        "/wp-content/malware/", "/wp-content/scanner/",
-
-        # ==================== NOVOS CAMINHOS DE ADMIN ====================
-        "/wp-admin/network/admin.php", "/wp-admin/network/update-core.php", "/wp-admin/network/plugins.php",
-        "/wp-admin/network/themes.php", "/wp-admin/network/users.php", "/wp-admin/network/settings.php",
-        "/wp-admin/network/site-new.php", "/wp-admin/network/site-info.php", "/wp-admin/network/site-settings.php",
-        "/wp-admin/network/site-themes.php", "/wp-admin/network/site-users.php",
-
-        # ==================== NOVOS CAMINHOS DE INSTALAÇÃO ====================
-        "/wp-admin/install.php?step=1", "/wp-admin/install.php?step=2", "/wp-admin/setup-config.php?step=1",
-        "/wp-admin/setup-config.php?step=2", "/wp-admin/setup-config.php?step=3",
-
-        # ==================== NOVOS CAMINHOS DE XML-RPC ====================
-        "/xmlrpc.php?rsd", "/xmlrpc.php?wlw", "/xmlrpc.php?mt", "/xmlrpc.php?blogger",
-        "/xmlrpc.php?metaWeblog", "/xmlrpc.php?demo", "/xmlrpc.php?test",
-
-        # ==================== NOVOS CAMINHOS DE MULTISITE ====================
-        "/wp-includes/ms-default-filters.php", "/wp-includes/ms-constants.php", "/wp-includes/ms-functions.php",
-        "/wp-includes/ms-default-constants.php", "/wp-includes/ms-load.php", "/wp-includes/ms-settings.php",
-        "/wp-includes/ms-deprecated.php", "/wp-includes/ms-files.php", "/wp-includes/ms-blogs.php",
-        "/wp-includes/ms-sites.php",
-
-        # ==================== NOVOS CAMINHOS OCULTOS ====================
-        "/wp-content/.mysql/", "/wp-content/.backup-db/", "/wp-content/.sql-backup/",
-        "/wp-content/.database-backup/", "/wp-content/.site-backup/", "/wp-content/.wp-backup/",
-        "/wp-content/.backup-2024/", "/wp-content/.backup-2025/", "/wp-content/.temp/",
-        "/wp-content/.tmp/", "/wp-content/.cache/", "/wp-content/.logs/",
-
-        # ==================== NOVOS CAMINHOS DE WORDPRESS 6.8+ ====================
-        "/wp-json/wp-block-editor/v1/url-details", "/wp-json/wp-block-editor/v1/export",
-        "/wp-json/wp/v2/block-patterns/categories", "/wp-json/wp/v2/font-families",
-        "/wp-json/wp/v2/font-faces", "/wp-json/wp/v2/templates/lookup",
-        "/wp-json/wp/v2/template-parts/lookup"
     )
     
     Write-Host "   [WORDLIST] Loaded $($wpAttackPaths.Count) WordPress-specific paths" -ForegroundColor Yellow
@@ -3652,7 +3448,7 @@ function Invoke-WordPressPenetration {
     }
 }
 
-function Invoke-GenericAggressiveScan {
+function Invoke-Generic_Paths_plus {
     param(
         [string]$Url,
         [object]$Session
@@ -3660,227 +3456,73 @@ function Invoke-GenericAggressiveScan {
     
     Write-Host "`n[GENERIC AGGRESSIVE] Launching comprehensive scan..." -ForegroundColor Red
     
-    # PATHS GENÉRICOS AGRESSIVOS (já corrigido)
     $genericPaths = @(
-        "/.env", "/.env.local", "/.env.production", "/config.php", "/config.json",
-        "/configuration.php", "/settings.php", "/secrets.json", "/credentials.json",
-        "/backup.sql", "/dump.sql", "/database.sql", "/backup.zip", "/backup.tar.gz",
-        "/access.log", "/error.log", "/debug.log", "/logs/access.log",
-        "/admin", "/administrator", "/login", "/panel", "/dashboard",
-        "/admin/login", "/administrator/login",
-        "/api", "/api/v1", "/graphql", "/swagger", "/docs",
-        "/backup/", "/backups/", "/uploads/", "/files/", "/database/",
-        "/logs/", "/tmp/", "/temp/", "/data/",
-        "/.env", "/.env.local", "/.env.production", "/.env.development", 
-        "/.env.test", "/.env.staging", "/.env.demo", "/.env.backup",
-        "/.env.old", "/.env.tmp", "/.env.bak", "/.env.save",
-        "/.env.example", "/.env.sample", "/.env.dist", "/.env.default",
-        "/config.php", "/config.php.bak", "/config.php.old", "/config.php.save",
-        "/config.json", "/config.json.bak", "/config.json.old",
-        "/config.yml", "/config.yaml", "/config.ini", "/config.xml",
-        "/configuration.php", "/settings.php", "/setup.php", "/conf.php",
-        "/app.config", "/application.config", "/system.config",
-        "/database.yml", "/database.yaml", "/database.conf", "/db.conf",
-        "/mysql.conf", "/postgres.conf", "/mongodb.conf",
-        "/secrets.json", "/credentials.json", "/keys.json", "/auth.json",
-        "/api-keys.json", "/tokens.json", "/passwords.json",
-        "/backup.sql", "/dump.sql", "/database.sql", "/db.sql", "/data.sql",
-        "/backup.sql.gz", "/dump.sql.gz", "/database.sql.gz", "/db.sql.gz",
-        "/backup.zip", "/dump.zip", "/database.zip", "/site.zip", "/web.zip",
-        "/backup.tar", "/dump.tar", "/database.tar", "/site.tar",
-        "/backup.tar.gz", "/dump.tar.gz", "/database.tar.gz",
-        "/backup_2024.sql", "/dump_2024.sql", "/backup_2023.sql",
-        "/access.log", "/error.log", "/debug.log", "/application.log",
-        "/server.log", "/system.log", "/security.log", "/audit.log",
-        "/logs/access.log", "/logs/error.log", "/var/log/access.log",
-        "/var/log/error.log", "/tmp/access.log", "/tmp/error.log",
-        "/.git/HEAD", "/.git/config", "/.git/description", "/.git/hooks",
-        "/.git/objects", "/.git/refs", "/.git/logs", "/.git/info",
-        "/.svn/entries", "/.svn/format", "/.svn/wc.db", "/.svn/pristine",
-        "/.hg/requires", "/.hg/branch", "/.hg/dirstate", "/.hg/00changelog.i",
-        "/.bzr/README", "/.bzr/branch-format", "/.bzr/branch/last-revision",
-        "/admin", "/administrator", "/panel", "/dashboard", "/console",
-        "/control", "/manager", "/backend", "/backoffice", "/cp",
-        "/cpanel", "/webmin", "/plesk", "/directadmin", "/virtuozzo",   
-        "/hestia", "/vesta", "/ispconfig", "/zpanel", "/sentora",
-        "/admin/login", "/administrator/login", "/panel/login", 
-        "/dashboard/login", "/console/login", "/manager/login",
-        "/backend/login", "/backoffice/login", "/cp/login",
-        "/adminarea", "/admincp", "/administer", "/administration",
-        "/sysadmin", "/superuser", "/root", "/godmode", "/superadmin",
-        "/master", "/operator", "/moderator", "/editor", "/publisher",
-        "/login", "/log-in", "/signin", "/sign-in", "/auth", "/authentication",
-        "/user/login", "/member/login", "/account/login", "/client/login",
-        "/staff/login", "/employee/login", "/operator/login",
-        "/wp-admin", "/wp-login", "/wp-login.php", "/wordpress/admin",
-        "/joomla/administrator", "/drupal/admin", "/magento/admin",
-        "/prestashop/admin", "/opencart/admin", "/laravel/admin",
-        "/wp-admin/", "/wp-content/", "/wp-includes/", "/wp-json/",
-        "/xmlrpc.php", "/wp-config.php", "/wp-config.php.bak",
-        "/wp-config.php.old", "/wp-config.php.save",
-        "/wp-load.php", "/wp-cron.php", "/wp-mail.php", "/wp-trackback.php",
-        "/readme.html", "/license.txt", "/wp-config-sample.php",
-        "/wp-content/uploads/", "/wp-content/plugins/", "/wp-content/themes/",
-        "/storage/logs/", "/bootstrap/cache/", "/storage/framework/",
-        "/app/Http/Controllers/", "/routes/", "/database/", "/resources/",
-        "/artisan", "/composer.json", "/composer.lock", "/package.json",
-        "/server.php", "/public/index.php",
-        "/package.json", "/package-lock.json", "/yarn.lock", "/npm-shrinkwrap.json",
-        "/node_modules/", "/app.js", "/server.js", "/index.js", "/main.js",
-        "/bin/www", "/src/", "/lib/", "/dist/", "/build/", "/public/",
-        "/routes/", "/controllers/", "/models/", "/views/", "/config/",
-        "/info.php", "/phpinfo.php", "/test.php", "/debug.php", "/example.php",
-        "/demo.php", "/check.php", "/status.php", "/health.php",
-        "/phpinfo", "/test", "/demo", "/check", "/status",
-        "/adminer.php", "/phpmyadmin/", "/pma/", "/myadmin/", "/mysql/",
-        "/xampp/", "/cgi-bin/", "/server-status", "/server-info",
-        "/cgi-bin/phpinfo", "/cgi-bin/test.cgi",
-        "/WEB-INF/", "/WEB-INF/web.xml", "/WEB-INF/classes/", "/WEB-INF/lib/",
-        "/META-INF/", "/META-INF/MANIFEST.MF", "/META-INF/context.xml",
-        "/struts-config.xml", "/applicationContext.xml", "/spring.xml",
-        "/beans.xml", "/web.xml", "/server.xml", "/context.xml",
-        "/phpmyadmin/", "/adminer/", "/mysql/", "/pgsql/", "/mongodb/",
-        "/dbadmin/", "/database/", "/dba/", "/sql/", "/db/",
-        "/phpMyAdmin/", "/pma/", "/myadmin/", "/db/phpmyadmin/",
-        "/filemanager/", "/files/", "/explorer/", "/browser/",
-        "/manager/", "/webftp/", "/ftp/", "/upload/", "/download/",
-        "/fileman/", "/filemanager/", "/filebrowser/", "/fileexplorer/",
-        "/api", "/api/v1", "/api/v2", "/api/v3", "/api/v4",
-        "/graphql", "/rest", "/json", "/xml", "/soap",
-        "/swagger", "/swagger-ui", "/openapi", "/redoc",
-        "/docs", "/documentation", "/api-docs", "/api/documentation",
-        "/v1/api", "/v2/api", "/v3/api", "/v1/rest", "/v2/rest",
-        "/debug", "/develop", "/development", "/dev",
-        "/test", "/testing", "/stage", "/staging", "/preprod",
-        "/console", "/shell", "/terminal", "/cmd", "/cli",
-        "/_debug", "_development", "_test", "_staging",
-        "/backup/", "/backups/", "/backupfiles/", "/backup_2024/", "/backup_2023/",
-        "/backup_2022/", "/backup_2021/", "/backup_2020/",
-        "/old/", "/temp/", "/tmp/", "/archive/", "/archives/",
-        "/uploads/", "/files/", "/downloads/", "/media/",
-        "/assets/", "/static/", "/public/", "/shared/", "/common/",
-        "/inc/", "/include/", "/includes/", "/lib/", "/library/",
-        "/src/", "/source/", "/scripts/", "/js/", "/css/", "/styles/",
-        "/logs/", "/log/", "/error_log/", "/debug_log/", "/cache/",
-        "/temp/", "/tmp/", "/session/", "/sessions/", "/data/",
-        "/storage/", "/var/", "/opt/", "/usr/", "/home/", "/etc/",
-        "/.aws/credentials", "/.kube/config", "/.docker/config.json",
-        "/latest/meta-data/", "/meta-data/", "/instance-data/",
-        "/var/run/docker.sock", "/containers/json", "/images/json",
-        "/kubernetes/", "/k8s/", "/docker/", "/podman/", "/containerd/",
-        "/.gitlab-ci.yml", "/.travis.yml", "/Jenkinsfile", "/circle.yml",
-        "/dockerfile", "/docker-compose.yml", "/compose.yaml", "/compose.yml",
-        "/.github/", "/gitlab/", "/bitbucket/", "/azure/", "/gcp/",
-        "/..%2f..%2f..%2f..%2fetc/passwd",
-        "/..%252f..%252f..%252f..%252fetc/passwd",
-        "/....//....//....//....//etc/passwd",
-        "/..;/..;/..;/etc/passwd",
-        "/..%255c..%255c..%255c..%255cetc/passwd",
-        "/..%5c..%5c..%5c..%5cetc/passwd",
-        "/..%2f..%2f..%2f..%2f..%2f..%2fetc/passwd",
-        "/..%2f..%2f..%2f..%2f..%2f..%2f..%2f..%2fetc/passwd",
-        "/%00", "/%0a", "/%0d", "/%09", "/%20", "/%25", "/%2e", "/%2f",
-        "/|", "/&", "/;", "/%", "/$", "/@", "/!", "/#", "/~", "/",
-        "/..", "/../", "/./", "/.../", "/....", "/.....",
-        "/..%2f", "/..%5c", "/%2e%2e%2f", "/%2e%2e%5c",
-        "/%2e%2e/", "/%2e%2e\\",
-        "/%2e/", "/%2e\\",
-        "/%2e%2f", "/%2e%5c",
-        "/././", "/./../", "/.././", "/../../",
-        "/..././", "/.../../", "/....//", "/.....//",
-        "/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/",
-        "/AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA/",
-        "/0000000000000000000000000000000000000000/",
-        "/../../../../../../../../../../../../etc/passwd",
-        "/..\\..\\..\\..\\..\\..\\..\\..\\..\\..\\windows\\win.ini",
-        "/%2e%2e%2f%2e%2e%2f%2e%2e%2f%2e%2e%2fetc/passwd",
-        "/....//....//....//....//....//....//etc/passwd",
-        "/..%2f..%2f..%2f..%2f..%2f..%2f..%2f..%2fetc/passwd",
-        "/AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
-        "/$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$",
-        "/%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%",
-        "/test.php%00.jpg", "/test.asp%00.html", "/test.jsp%00.txt",
-        "/.env%00", "/config.php%00.txt", "/settings.py%00.bak",
-        "/wp-config.php%00.bak", "/backup.sql%00.zip",
-        "/database.yml%00.old", "/secrets.json%00.tmp",
-        "/administrator/", "/components/", "/modules/", "/plugins/",
-        "/templates/", "/images/", "/media/", "/cache/",
-        "/language/", "/includes/", "/libraries/", "/tmp/",
-        "/sites/default/", "/modules/", "/themes/",
-        "/profiles/", "/includes/", "/misc/",
-        "/var/", "/media/", "/skin/", "/app/",
-        "/lib/", "/includes/", "/pkginfo/",
-        "/downloader/", "/errors/", "/js/",
-        "/static/", "/media/", "/settings.py",
-        "/urls.py", "/manage.py", "/requirements.txt",
-        "/Gemfile", "/Gemfile.lock", "/config/database.yml",
-        "/config/secrets.yml", "/db/schema.rb", "/app/controllers/",
-        "/web.config", "/web.config.bak", "/global.asax",
-        "/bin/", "/app_code/", "/app_data/", "/app_themes/",
-        "/.ssh/authorized_keys", "/.ssh/id_rsa", "/.ssh/id_dsa", "/.ssh/id_ecdsa", "/.ssh/id_ed25519",
-        "/.ssh/known_hosts", "/.ssh/config",
-        "/.npmrc", "/.yarnrc", "/.python-version", "/.ruby-version", "/.rbenv-vars",
-        "/.envrc", "/.vault", "/.vault-token", "/.netrc", "/.pgpass",
-        "/.htpasswd", "/.htaccess", "/.htaccess.bak",
-        "/id_rsa", "/id_dsa", "/id_ecdsa", "/id_ed25519",
-        "/credentials.yml", "/secrets.yml", "/secrets.env",
-        "/service-account.json", "/gcloud/service-account.json",
-        "/aws-credentials", "/aws_creds", "/aws_keys",
-        "/backup.sql.gz", "/db_dump.sql", "/mysql_dump.sql", "/pg_dump.sql",
-        "/dump/latest.sql", "/backups/latest.tar.gz", "/db/backups/",
-        "/sql/dumps/", "/backup/db/", "/export/", "/exports/",
-        "/.pgpass", "/.my.cnf", "/my.cnf", "/mysql.cnf",
-        "/.cache/", "/npm-cache/", "/pip-cache/", "/cache/", "/tmp/logs/",
-        "/var/log/nginx/access.log", "/var/log/nginx/error.log",
-        "/var/log/apache2/access.log", "/var/log/apache2/error.log",
-        "/var/log/php-fpm.log", "/var/log/supervisor/supervisord.log",
-        "/.bash_history", "/.zsh_history", "/.profile", "/.bashrc",
-        "/artifacts/", "/releases/", "/builds/", "/dist/", "/pkg/",
-        "/.gitlab-ci.yml", "/.github/workflows/", "/azure-pipelines.yml",
-        "/.circleci/config.yml", "/Jenkinsfile", "/workspace/", "/ci/artefacts/",
-        "/Dockerfile", "/docker-compose.yml", "/docker-compose.prod.yml",
-        "/run/secrets/", "/etc/secrets/", "/var/lib/docker/volumes/",
-        "/.kube/config", "/kube-config", "/k8s/config", "/helm/", "/charts/",
-        "/.helm/", "/secrets/values.yaml", "/manifests/",
-        "/latest/meta-data/iam/security-credentials/", "/computeMetadata/v1/instance/service-accounts/",
-        "/meta-data/iam/", "/instance-data/", "/.gcp/metadata", "/.azure/", "/.aws/",
-        "/.s3cfg", "/s3cfg", "/azure/credentials", "/gcloud/config",
-        "/adminpanel/", "/adminarea/login", "/manage", "/management",
-        "/vendor/phpmyadmin/", "/pma/index.php", "/adminer.php", "/adminer/",
-        "/phpmyadmin/index.php", "/phpmyadmin/sql.php", "/phpmyadmin/export.php",
-        "/web-console/", "/console.php", "/panel.php",
-        "/wp-json/wp/v2/themes", "/wp-json/wp/v2/plugins", "/wp-content/upgrade/",
-        "/wp-snapshots/", "/wp-content/backup-db/", "/wp-content/ai-plugin/",
-        "/magento/backup/", "/magento/var/log/system.log", "/admin_maintenance/",
-        "/joomla/installation/", "/administrator/components/com_installer/",
-        "/opencart/system/storage/", "/prestashop/install/",
-        "/.env.backup", "/config/database.yml", "/config/credentials/production.key",
-        "/config/master.key", "/storage/cron/", "/storage/sessions/", "/storage/framework/sessions/",
-        "/vendor/composer/installed.json", "/composer.lock", "/package-lock.json",
-        "/requirements.txt", "/Pipfile.lock", "/poetry.lock",
-        "/swagger.json", "/openapi.yaml", "/openapi.yml", "/.well-known/jwks.json",
-        "/.well-known/openid-configuration", "/oauth/token", "/oauth/authorize",
-        "/.well-known/security.txt", "/.well-known/change-password",
-        "/healthz", "/ready", "/live", "/status/health", "/status/ready", "/health-check",
-        "/metrics", "/prometheus/metrics", "/actuator/health", "/actuator/env", "/uptime",
-        "/version", "/_status", "/_monitoring",
-        "/uploads/backup.zip", "/uploads/backup.tar.gz", "/upload/tmp/", "/tmp/uploads/",
-        "/filemanager/dialog.php", "/filemanager/index.php", "/webftp/", "/ftp/upload/",
-        "/download/files/", "/download/releases/", "/downloads/latest.zip",
-        "/.git/packed-refs", "/.git/refs/heads/", "/.git/logs/HEAD",
-        "/svn/entries", "/svn/wc.db", "/.envgit", "/.git-credentials",
-        "/.netlify/", "/netlify.toml", "/now.json", "/vercel.json",
-        "/%00.png", "/.env%00.txt", "/config.php%00%2ephp", "/wp-config.php%00%2etxt",
-        "/..%2f..%2fetc/shadow", "/..%5c..%5cwindows\\system32\\drivers\\etc\\hosts",
-        "/etc/hosts", "/etc/shadow", "/etc/sudoers", "/etc/ssh/sshd_config",
-        "/proc/self/environ", "/proc/version", "/boot/config.txt",
-        "/phpinfo.php", "/xdebug/", "/opcache-status", "/status/php",
-        "/redis/monitor", "/redis/cli", "/phpmyadmin/setup.php", "/pgadmin4/",
-        "/pgadmin/", "/adminer-standalone.php",
-        "/.DS_Store", "/Thumbs.db", "/desktop.ini", "/robots.txt", "/humans.txt",
-        "/sitemap.xml", "/CHANGELOG", "/LICENSE", "/INSTALL", "/README.md",
-        "/SECURITY.md", "/CONTRIBUTING.md",
-        "/share/", "/smb/", "/samba/", "/ftp/files/", "/ftp/anon/", "/ftp/pub/"
+        "/.env", "/.env.local", "/.env.production", "/config.php", "/config.json", "/configuration.php", "/settings.php", "/secrets.json", "/credentials.json", "/backup.sql", "/dump.sql",
+        "/database.sql", "/backup.zip", "/backup.tar.gz", "/access.log", "/error.log", "/debug.log", "/logs/access.log", "/admin", "/administrator", "/login",
+        "/panel", "/dashboard", "/admin/login", "/administrator/login", "/api", "/api/v1", "/graphql", "/swagger", "/docs", "/backup/",
+        "/backups/", "/uploads/", "/files/", "/database/", "/logs/", "/tmp/", "/temp/", "/data/", "/.env.development", "/.env.test",
+        "/.env.staging", "/.env.demo", "/.env.backup", "/.env.old", "/.env.tmp", "/.env.bak", "/.env.save", "/.env.example", "/.env.sample", "/.env.dist",
+        "/.env.default", "/config.php.bak", "/config.php.old", "/config.php.save", "/config.json.bak", "/config.json.old", "/config.yml", "/config.yaml", "/config.ini", "/config.xml", "/setup.php",
+        "/conf.php", "/app.config", "/application.config", "/system.config", "/database.yml", "/database.yaml", "/database.conf", "/db.conf", "/mysql.conf", "/postgres.conf", "/mongodb.conf",
+        "/keys.json", "/auth.json", "/api-keys.json", "/tokens.json", "/passwords.json", "/db.sql", "/data.sql", "/backup.sql.gz", "/dump.sql.gz", "/database.sql.gz", "/db.sql.gz",
+        "/dump.zip", "/database.zip", "/site.zip", "/web.zip", "/backup.tar", "/dump.tar", "/database.tar", "/site.tar", "/dump.tar.gz", "/database.tar.gz", "/backup_2024.sql",
+        "/dump_2024.sql", "/backup_2023.sql", "/application.log", "/server.log", "/system.log", "/security.log", "/audit.log", "/logs/error.log", "/var/log/access.log", "/var/log/error.log", "/tmp/access.log",
+        "/tmp/error.log", "/.git/HEAD", "/.git/config", "/.git/description", "/.git/hooks", "/.git/objects", "/.git/refs", "/.git/logs", "/.git/info", "/.svn/entries", "/.svn/format",
+        "/.svn/wc.db", "/.svn/pristine", "/.hg/requires", "/.hg/branch", "/.hg/dirstate", "/.hg/00changelog.i", "/.bzr/README", "/.bzr/branch-format", "/.bzr/branch/last-revision", "/console", "/control",
+        "/manager", "/backend", "/backoffice", "/cp", "/cpanel", "/webmin", "/plesk", "/directadmin", "/virtuozzo", "/hestia", "/vesta",
+        "/ispconfig", "/zpanel", "/sentora", "/panel/login", "/dashboard/login", "/console/login", "/manager/login", "/backend/login", "/backoffice/login", "/cp/login", "/adminarea",
+        "/admincp", "/administer", "/administration", "/sysadmin", "/superuser", "/root", "/godmode", "/superadmin", "/master", "/operator", "/moderator",
+        "/editor", "/publisher", "/log-in", "/signin", "/sign-in", "/auth", "/authentication", "/user/login", "/member/login", "/account/login", "/client/login",
+        "/staff/login", "/employee/login", "/operator/login", "/wp-admin", "/wp-login", "/wp-login.php", "/wordpress/admin", "/joomla/administrator", "/drupal/admin", "/magento/admin", "/prestashop/admin",
+        "/opencart/admin", "/laravel/admin", "/wp-admin/", "/wp-content/", "/wp-includes/", "/wp-json/", "/xmlrpc.php", "/wp-config.php", "/wp-config.php.bak", "/wp-config.php.old", "/wp-config.php.save",
+        "/wp-load.php", "/wp-cron.php", "/wp-mail.php", "/wp-trackback.php", "/readme.html", "/license.txt", "/wp-config-sample.php", "/wp-content/uploads/", "/wp-content/plugins/", "/wp-content/themes/", "/storage/logs/",
+        "/bootstrap/cache/", "/storage/framework/", "/app/Http/Controllers/", "/routes/", "/resources/", "/artisan", "/composer.json", "/composer.lock", "/package.json", "/server.php", "/public/index.php",
+        "/package-lock.json", "/yarn.lock", "/npm-shrinkwrap.json", "/node_modules/", "/app.js", "/server.js", "/index.js", "/main.js", "/bin/www", "/src/", "/lib/",
+        "/dist/", "/build/", "/public/", "/controllers/", "/models/", "/views/", "/config/", "/info.php", "/phpinfo.php", "/test.php", "/debug.php",
+        "/example.php", "/demo.php", "/check.php", "/status.php", "/health.php", "/phpinfo", "/test", "/demo", "/check", "/status", "/adminer.php",
+        "/phpmyadmin/", "/pma/", "/myadmin/", "/mysql/", "/xampp/", "/cgi-bin/", "/server-status", "/server-info", "/cgi-bin/phpinfo", "/cgi-bin/test.cgi", "/WEB-INF/",
+        "/WEB-INF/web.xml", "/WEB-INF/classes/", "/WEB-INF/lib/", "/META-INF/", "/META-INF/MANIFEST.MF", "/META-INF/context.xml", "/struts-config.xml", "/applicationContext.xml", "/spring.xml", "/beans.xml", "/web.xml",
+        "/server.xml", "/context.xml", "/dbadmin/", "/dba/", "/sql/", "/db/", "/phpMyAdmin/", "/filemanager/", "/explorer/", "/browser/", "/webftp/", "/ftp/",
+        "/upload/", "/download/", "/fileman/", "/filebrowser/", "/fileexplorer/", "/api/v2", "/api/v3", "/api/v4", "/rest", "/json", "/xml",
+        "/soap", "/swagger-ui", "/openapi", "/redoc", "/documentation", "/api-docs", "/api/documentation", "/v1/api", "/v2/api", "/v3/api", "/v1/rest",
+        "/v2/rest", "/develop", "/development", "/dev", "/testing", "/stage", "/staging", "/preprod", "/shell", "/terminal", "/cmd",
+        "/cli", "/_debug", "_development", "_test", "_staging", "/backupfiles/", "/backup_2023/", "/backup_2022/", "/backup_2021/", "/backup_2020/", "/old/",
+        "/archive/", "/archives/", "/downloads/", "/media/", "/assets/", "/static/", "/public/", "/shared/", "/common/", "/inc/", "/include/",
+        "/includes/", "/library/", "/source/", "/scripts/", "/js/", "/css/", "/styles/", "/log/", "/error_log/", "/debug_log/", "/cache", "/session/",
+        "/sessions/", "/storage/", "/var/", "/opt/", "/usr/", "/home/", "/etc/", "/.aws/credentials", "/.kube/config", "/.docker/config.json", "/latest/meta-data/",
+        "/meta-data/", "/instance-data/", "/var/run/docker.sock", "/containers/json", "/images/json", "/kubernetes/", "/k8s/", "/docker/", "/podman/", "/containerd/", "/.gitlab-ci.yml",
+        "/.travis.yml", "/circle.yml", "/dockerfile", "/docker-compose.yml", "/compose.yaml", "/compose.yml", "/.github/", "/gitlab/", "/bitbucket/", "/azure/", "/gcp/",
+        "/..%2f..%2f..%2f..%2fetc/passwd", "/..%252f..%252f..%252f..%252fetc/passwd", "/....//....//....//....//etc/passwd", "/..;/..;/..;/etc/passwd", "/..%255c..%255c..%255c..%255cetc/passwd", "/..%5c..%5c..%5c..%5cetc/passwd",
+        "/..%2f..%2f..%2f..%2f..%2f..%2fetc/passwd", "/..%2f..%2f..%2f..%2f..%2f..%2f..%2f..%2fetc/passwd", "/%00", "/%0a", "/%0d", "/%09", "/%20",
+        "/%25", "/%2e", "/%2f", "/|", "/&", "/;", "/%", "/$", "/@", "/!", "/#", "/", "/..", "/../", "/./", "/.../",
+        "/....", "/.....", "/..%2f", "/..%5c", "/%2e%2e%2f", "/%2e%2e%5c", "/%2e%2e/", "/%2e%2e\\", "/%2e/", "/%2e\\", "/%2e%2f", "/%2e%5c",
+        "/././", "/./../", "/.././", "/../../", "/..././", "/.../../", "/....//", "/.....//", "/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/", "/AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA/", "/0000000000000000000000000000000000000000/",
+        "/../../../../../../../../../../../../etc/passwd", "/..\\..\\..\\..\\..\\..\\..\\..\\..\\..\\windows\\win.ini", "/%2e%2e%2f%2e%2e%2f%2e%2e%2f%2e%2e%2fetc/passwd", "/....//....//....//....//....//....//etc/passwd", "/AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA", "/$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$",
+        "/%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%", "/test.php%00.jpg", "/test.asp%00.html", "/test.jsp%00.txt", "/.env%00", "/config.php%00.txt", "/settings.py%00.bak", "/wp-config.php%00.bak", "/backup.sql%00.zip", "/database.yml%00.old", "/secrets.json%00.tmp",
+        "/administrator/", "/components/", "/modules/", "/plugins/", "/templates/", "/images/", "/cache/", "/language/", "/libraries/", "/sites/default/", "/modules/",
+        "/themes/", "/profiles/", "/misc/", "/var/", "/skin/", "/app/", "/pkginfo/", "/downloader/", "/errors/", "/settings.py",
+        "/urls.py", "/manage.py", "/requirements.txt", "/Gemfile", "/Gemfile.lock", "/config/database.yml", "/config/secrets.yml", "/db/schema.rb", "/app/controllers/", "/web.config", "/web.config.bak",
+        "/global.asax", "/bin/", "/app_code/", "/app_data/", "/app_themes/", "/.ssh/authorized_keys", "/.ssh/id_rsa", "/.ssh/id_dsa", "/.ssh/id_ecdsa", "/.ssh/id_ed25519", "/.ssh/known_hosts",
+        "/.ssh/config", "/.npmrc", "/.yarnrc", "/.python-version", "/.ruby-version", "/.rbenv-vars", "/.envrc", "/.vault", "/.vault-token", "/.netrc", "/.pgpass",
+        "/.htpasswd", "/.htaccess", "/.htaccess.bak", "/id_rsa", "/id_dsa", "/id_ecdsa", "/id_ed25519", "/credentials.yml", "/secrets.yml", "/secrets.env", "/service-account.json",
+        "/gcloud/service-account.json", "/aws-credentials", "/aws_creds", "/aws_keys", "/db_dump.sql", "/mysql_dump.sql", "/pg_dump.sql", "/dump/latest.sql", "/backups/latest.tar.gz", "/db/backups/",
+        "/sql/dumps/", "/backup/db/", "/export/", "/exports/", "/.my.cnf", "/my.cnf", "/mysql.cnf", "/.cache/", "/npm-cache/", "/pip-cache/",
+        "/tmp/logs/", "/var/log/nginx/access.log", "/var/log/nginx/error.log", "/var/log/apache2/access.log", "/var/log/apache2/error.log", "/var/log/php-fpm.log", "/var/log/supervisor/supervisord.log", "/.bash_history", "/.zsh_history", "/.profile", "/.bashrc",
+        "/artifacts/", "/releases/", "/builds/", "/dist/", "/pkg/", "/.github/workflows/", "/azure-pipelines.yml", "/.circleci/config.yml", "/workspace/", "/ci/artefacts/", "/docker-compose.prod.yml",
+        "/run/secrets/", "/etc/secrets/", "/var/lib/docker/volumes/", "/kube-config", "/k8s/config", "/helm/", "/charts/", "/.helm/", "/secrets/values.yaml", "/manifests/", "/latest/meta-data/iam/security-credentials/",
+        "/computeMetadata/v1/instance/service-accounts/", "/meta-data/iam/", "/instance-data/", "/.gcp/metadata", "/.azure/", "/.aws/", "/.s3cfg", "/s3cfg", "/azure/credentials", "/gcloud/config",
+        "/adminpanel/", "/adminarea/login", "/manage", "/management", "/vendor/phpmyadmin/", "/pma/index.php", "/phpmyadmin/index.php", "/phpmyadmin/sql.php", "/phpmyadmin/export.php", "/web-console/", "/console.php",
+        "/panel.php", "/wp-json/wp/v2/themes", "/wp-json/wp/v2/plugins", "/wp-content/upgrade/", "/wp-snapshots/", "/wp-content/backup-db/", "/wp-content/ai-plugin/", "/magento/backup/", "/magento/var/log/system.log", "/admin_maintenance/",
+        "/joomla/installation/", "/administrator/components/com_installer/", "/opencart/system/storage/", "/prestashop/install/", "/.env.backup", "/config/credentials/production.key", "/config/master.key", "/storage/cron/", "/storage/sessions/", "/storage/framework/sessions/",
+        "/vendor/composer/installed.json", "/requirements.txt", "/Pipfile.lock", "/poetry.lock", "/swagger.json", "/openapi.yaml", "/openapi.yml", "/.well-known/jwks.json", "/.well-known/openid-configuration", "/oauth/token", "/oauth/authorize",
+        "/.well-known/security.txt", "/.well-known/change-password", "/healthz", "/ready", "/live", "/status/health", "/status/ready", "/health-check", "/metrics", "/prometheus/metrics", "/actuator/health",
+        "/actuator/env", "/uptime", "/version", "/_status", "/_monitoring", "/upload/tmp/", "/tmp/uploads/", "/filemanager/dialog.php", "/filemanager/index.php", "/webftp/", "/ftp/upload/",
+        "/download/files/", "/downloads/latest.zip", "/.git/packed-refs", "/.git/refs/heads/", "/.git/logs/HEAD", "/svn/entries", "/svn/wc.db", "/.envgit", "/.git-credentials", "/.netlify/",
+        "/netlify.toml", "/now.json", "/vercel.json", "/%00.png", "/.env%00.txt", "/config.php%00%2ephp", "/wp-config.php%00%2etxt", "/..%2f..%2fetc/shadow", "/..%5c..%5cwindows\\system32\\drivers\\etc\\hosts", "/etc/hosts",
+        "/etc/shadow", "/etc/sudoers", "/etc/ssh/sshd_config", "/proc/self/environ", "/proc/version", "/boot/config.txt", "/xdebug/", "/opcache-status", "/status/php", "/redis/monitor", "/redis/cli",
+        "/phpmyadmin/setup.php", "/pgadmin4/", "/pgadmin/", "/adminer-standalone.php", "/.DS_Store", "/Thumbs.db", "/desktop.ini", "/robots.txt", "/humans.txt", "/sitemap.xml", "/INSTALL",
+        "/SECURITY.md", "/CONTRIBUTING.md", "/share/", "/smb/", "/samba/", "/ftp/files/", "/ftp/anon/", "/ftp/pub/"
+
     )
     
     Write-Host "   [WORDLIST] Loaded $($genericPaths.Count) generic aggressive paths" -ForegroundColor Yellow
@@ -4214,23 +3856,6 @@ function Start-FuzzingRecursive {
         }
 
         # =============================================
-        # AGGRESSIVE MODE - EXECUTA PRIMEIRO (SE ATIVADO)
-        # =============================================
-        if ($Aggressive) {
-            try {
-                $aggressiveResult = Invoke-IntelligentDetection -Url $url -Wordlist $wordlist -MaxDepth $MaxDepth -TimeoutMs $TimeoutMs -MaxThreads $MaxThreads -BaseHost $baseHost -Session $session
-                
-                if ($aggressiveResult) {
-                    Write-Host "   [SUCCESS] Intelligent Detection completed successfully" -ForegroundColor DarkGreen
-                }
-            } catch {
-                Write-Log "Erro no Intelligent Detection: $($_.Exception.Message)" "ERROR"
-                Write-Host "[ERROR] Intelligent Detection failed: $($_.Exception.Message)" -ForegroundColor Red
-                Write-Host "   Continuing with other scans..." -ForegroundColor Yellow
-            }
-        }
-
-        # =============================================
         # SUBDOMAIN FUZZING - EXECUTA SEGUNDO (SE ATIVADO)
         # =============================================
         if ($SubdomainFuzzing) {
@@ -4303,6 +3928,23 @@ function Start-FuzzingRecursive {
             Write-Log "Erro no recursive fuzzing: $($_.Exception.Message)" "ERROR"
             Write-Host "[ERROR] Recursive fuzzing failed: $($_.Exception.Message)" -ForegroundColor Red
             Write-Host "   Partial results will be shown..." -ForegroundColor Yellow
+        }
+
+        # =============================================
+        # AGGRESSIVE MODE - EXECUTA (SE ATIVADO)
+        # =============================================
+        if ($Aggressive) {
+            try {
+                $aggressiveResult = Invoke-IntelligentDetection -Url $url -Wordlist $wordlist -MaxDepth $MaxDepth -TimeoutMs $TimeoutMs -MaxThreads $MaxThreads -BaseHost $baseHost -Session $session
+                
+                if ($aggressiveResult) {
+                    Write-Host "   [SUCCESS] Intelligent Detection completed successfully" -ForegroundColor DarkGreen
+                }
+            } catch {
+                Write-Log "Erro no Intelligent Detection: $($_.Exception.Message)" "ERROR"
+                Write-Host "[ERROR] Intelligent Detection failed: $($_.Exception.Message)" -ForegroundColor Red
+                Write-Host "   Continuing with other scans..." -ForegroundColor Yellow
+            }
         }
 
         # ... (o resto do código permanece igual - estatísticas e resultados finais)
