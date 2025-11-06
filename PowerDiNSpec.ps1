@@ -30,7 +30,7 @@ function Logo_Menu {
                                     |_  ..  _|   | |_) |/ _//\\ \ /\ / // _ \| '__|  | | | || || | | |/ __|   | |_) |/  _ \ / __|     / /
                                     |_      _|   | .__/| (//) |\ V  V /|  __/| |     | |_/ || || | | |\__ \   | .__/|  ___/| (__     |_|
                                       |_||_|     |_|    \//__/  \_/\_/  \___||_|     |____/ |_||_| |_||___/   |_|    \____| \___|
-                                                        //               | |                (_)        |_|                           (_)           2.3.3v
+                                                        //               | |                (_)        |_|                           (_)           2.4.7v
 
                                          
 "@ -split "`n"
@@ -2826,25 +2826,28 @@ function Test-Endpoint {
         $isValidEndpoint = Test-RealEndpoint -Url $testUrl -Content $fullContent -ContentLength $contentLength -BaseSignature $baseSignature
         $shouldShow = Test-StatusCodeFilter -StatusCode $statusCode
         
+        # CORREÇÃO CRÍTICA: SEMPRE criar o objeto de resultado, independente de ser válido ou não
+        $title = if ($fullContent -match '<title[^>]*>(.*?)</title>') { 
+            $matches[1].Trim() 
+        } else { $null }
+        
+        $result = [PSCustomObject]@{
+            URL = $testUrl
+            StatusCode = $statusCode
+            ContentLength = $contentLength
+            Word = $parentWord
+            Depth = $currentDepth
+            IsValid = $isValidEndpoint  # Esta propriedade é o que importa!
+            Title = $title
+            ContentHash = $contentHash
+            Timestamp = Get-Date
+            Type = "Path"
+        }
+        
+        # CORREÇÃO CRÍTICA: SEMPRE adicionar ao results, mesmo que não seja válido
+        $allResults.Add($result)
+        
         if ($isValidEndpoint) {
-            $title = if ($fullContent -match '<title[^>]*>(.*?)</title>') { 
-                $matches[1].Trim() 
-            } else { $null }
-            
-            $result = [PSCustomObject]@{
-                URL = $testUrl
-                StatusCode = $statusCode
-                ContentLength = $contentLength
-                Word = $parentWord
-                Depth = $currentDepth
-                IsValid = $true
-                Title = $title
-                ContentHash = $contentHash
-                Timestamp = Get-Date
-                Type = "Path"
-            }
-            
-            $allResults.Add($result)
             $session.IncrementValidEndpoint()
             
             if ($shouldShow) {
@@ -2862,6 +2865,8 @@ function Test-Endpoint {
                 $statusColor = Get-StatusCodeColor -StatusCode $statusCode
                 $statusText = Get-StatusCodeText -StatusCode $statusCode
                 Write-Host "[PATH $statusText] $testUrl" -ForegroundColor $statusColor
+            } else {
+                $session.IncrementFiltered()
             }
             return $false
         }
@@ -2872,6 +2877,21 @@ function Test-Endpoint {
             $statusCode = [int]$webException.Response.StatusCode
             $shouldShow = Test-StatusCodeFilter -StatusCode $statusCode
             
+            # CORREÇÃO: Também criar resultado para respostas de erro
+            $result = [PSCustomObject]@{
+                URL = $testUrl
+                StatusCode = $statusCode
+                ContentLength = 0
+                Word = $parentWord
+                Depth = $currentDepth
+                IsValid = $false
+                Title = $null
+                ContentHash = "error_$statusCode"
+                Timestamp = Get-Date
+                Type = "Path"
+            }
+            $allResults.Add($result)
+            
             if ($shouldShow) {
                 $statusColor = Get-StatusCodeColor -StatusCode $statusCode
                 $statusText = Get-StatusCodeText -StatusCode $statusCode
@@ -2880,6 +2900,21 @@ function Test-Endpoint {
                 $session.IncrementFiltered()
             }
         } else {
+            # CORREÇÃO: Criar resultado para timeout/connection errors
+            $result = [PSCustomObject]@{
+                URL = $testUrl
+                StatusCode = 0
+                ContentLength = 0
+                Word = $parentWord
+                Depth = $currentDepth
+                IsValid = $false
+                Title = $null
+                ContentHash = "timeout_error"
+                Timestamp = Get-Date
+                Type = "Path"
+            }
+            $allResults.Add($result)
+            
             if ($global:FuzzingStatusCodes.Count -eq 0) {
                 Write-Host "[TIMEOUT] $testUrl" -ForegroundColor DarkYellow
             } else {
@@ -2888,6 +2923,20 @@ function Test-Endpoint {
         }
         return $false
     } catch {
+        $result = [PSCustomObject]@{
+            URL = $testUrl
+            StatusCode = 0
+            ContentLength = 0
+            Word = $parentWord
+            Depth = $currentDepth
+            IsValid = $false
+            Title = $null
+            ContentHash = "system_error"
+            Timestamp = Get-Date
+            Type = "Path"
+        }
+        $allResults.Add($result)
+        
         if ($global:FuzzingStatusCodes.Count -eq 0) {
             Write-Host "[ERROR] $testUrl - $($_.Exception.Message)" -ForegroundColor DarkRed
         } else {
@@ -3102,45 +3151,21 @@ function Start-FuzzingRecursive {
         Write-Host "Status" -NoNewline -ForegroundColor Blue
         Write-Host ")" -NoNewline -ForegroundColor White
         Write-Host " Words: " -NoNewline -ForegroundColor Gray
-        Write-Host "$($words.Count)" -ForegroundColor DarkRed
+        Write-Host "$($words.Count)" -ForegroundColor Cyan
 
         Write-Host "  " -NoNewline
         Write-Host "(" -NoNewline -ForegroundColor White
         Write-Host "Config" -NoNewline -ForegroundColor Magenta
         Write-Host ")" -NoNewline -ForegroundColor White
         Write-Host " Max Depth: " -NoNewline -ForegroundColor Gray
-
-        if ($MaxDepth -ge 1 -and $MaxDepth -le 2) {
-            Write-Host "$($MaxDepth)" -ForegroundColor Yellow
-        } elseif ($MaxDepth -ge 3 -and $MaxDepth -le 4) {
-            Write-Host "$($MaxDepth)" -ForegroundColor Green
-        } elseif ($MaxDepth -ge 5 -and $MaxDepth -le 6) {
-            Write-Host "$($MaxDepth)" -ForegroundColor DarkGreen
-        } elseif ($MaxDepth -ge 7 -and $MaxDepth -le 8) {
-            Write-Host "$($MaxDepth)" -ForegroundColor Red
-        } elseif ($MaxDepth -ge 9 -and $MaxDepth -le 10) {
-            Write-Host "$($MaxDepth)" -ForegroundColor DarkRed
-        } else {
-            Write-Host "$($MaxDepth)" -ForegroundColor Gray
-        }
+        Write-Host "$($MaxDepth)" -ForegroundColor Yellow
 
         Write-Host "  " -NoNewline
         Write-Host "(" -NoNewline -ForegroundColor White
         Write-Host "Config" -NoNewline -ForegroundColor Magenta
         Write-Host ")" -NoNewline -ForegroundColor White
         Write-Host " Timeout (ms): " -NoNewline -ForegroundColor Gray
-        
-        if ($global:FuzzingTimeoutMs -ge 500 -and $global:FuzzingTimeoutMs -le 1000) {
-            Write-Host "$($global:FuzzingTimeoutMs)" -ForegroundColor DarkRed  # Muito rápido = Alto risco
-        } elseif ($global:FuzzingTimeoutMs -ge 1001 -and $global:FuzzingTimeoutMs -le 2000) {
-            Write-Host "$($global:FuzzingTimeoutMs)" -ForegroundColor Red      # Rápido = Risco moderado
-        } elseif ($global:FuzzingTimeoutMs -ge 2001 -and $global:FuzzingTimeoutMs -le 5000) {
-            Write-Host "$($global:FuzzingTimeoutMs)" -ForegroundColor Yellow   # Moderado = Risco baixo
-        } elseif ($global:FuzzingTimeoutMs -ge 5001 -and $global:FuzzingTimeoutMs -le 30000) {
-            Write-Host "$($global:FuzzingTimeoutMs)" -ForegroundColor Green    # Lento = Baixo risco
-        } else {
-            Write-Host "$($global:FuzzingTimeoutMs)" -ForegroundColor Gray
-        }
+        Write-Host "$($TimeoutMs)" -ForegroundColor Yellow
 
         Write-Host "  " -NoNewline
         Write-Host "(" -NoNewline -ForegroundColor White
@@ -3181,7 +3206,7 @@ function Start-FuzzingRecursive {
             
             Write-Host "  Continuing with fallback signature..." -ForegroundColor Yellow
             
-            # Criar assinatura fallback robusta
+            # Criar assinatura fallback
             $baseSignature = @{
                 Url = $url
                 Title = "Fallback - Base Page Unavailable"
@@ -3191,8 +3216,6 @@ function Start-FuzzingRecursive {
                 StatusCode = 0
                 ContentType = "unknown"
             }
-            
-            Write-Host "  Using fallback base signature" -ForegroundColor Gray
         } else {
             Write-Log "Pagina base analisada - Titulo: '$($baseSignature.Title)', Tamanho: $($baseSignature.ContentLength) chars" "INFO"
             Write-Host "  Base Page: $($baseSignature.Title)" -ForegroundColor Gray
@@ -3200,9 +3223,7 @@ function Start-FuzzingRecursive {
             Write-Host "  Hash: $($baseSignature.ContentHash)" -ForegroundColor Gray
         }
 
-        # =============================================
-        # SUBDOMAIN FUZZING - EXECUTA SEGUNDO (SE ATIVADO)
-        # =============================================
+        # SUBDOMAIN FUZZING
         if ($SubdomainFuzzing) {
             Write-Host "`n[SUBDOMAIN FUZZING] Starting subdomain discovery..." -ForegroundColor Cyan
             try {
@@ -3215,9 +3236,12 @@ function Start-FuzzingRecursive {
                 if ($foundSubdomains.Count -gt 0) {
                     Write-Host "`n[SUBDOMAIN RESULTS] Found $($foundSubdomains.Count) valid subdomains:" -ForegroundColor Green
                     
-                    Write-Host "   Subdomains found:" -ForegroundColor Gray
                     foreach ($sub in $foundSubdomains) {
-                        Write-Host "     - $($sub.URL)" -ForegroundColor Yellow
+                        $statusColor = Get-StatusCodeColor -StatusCode $sub.StatusCode
+                        $statusText = Get-StatusCodeText -StatusCode $sub.StatusCode
+                        
+                        Write-Host "   [$statusText] " -NoNewline -ForegroundColor $statusColor
+                        Write-Host "$($sub.URL)" -ForegroundColor White
                     }
                     
                     $uniqueStatusCodes = $foundSubdomains.StatusCode | Sort-Object -Unique
@@ -3227,33 +3251,20 @@ function Start-FuzzingRecursive {
                     
                 } else {
                     Write-Host "`n[SUBDOMAIN RESULTS] No valid subdomains found" -ForegroundColor Yellow
-                    Write-Host "   All subdomains timed out or returned errors" -ForegroundColor Gray
-                    
-                    $allSubdomains = $session.AllResults | Where-Object { $_.Type -eq "Subdomain" }
-                    if ($allSubdomains.Count -gt 0) {
-                        $statusCount = $allSubdomains | Group-Object StatusCode | ForEach-Object {
-                            "$($_.Name): $($_.Count)"
-                        }
-                        Write-Host "   Responses received: $($statusCount -join ', ')" -ForegroundColor DarkGray
-                    }
                 }
                 
             } catch {
                 Write-Log "Erro no subdomain fuzzing: $($_.Exception.Message)" "ERROR"
                 Write-Host "[ERROR] Subdomain fuzzing failed: $($_.Exception.Message)" -ForegroundColor Red
-                Write-Host "   Continuing with main fuzzing..." -ForegroundColor Yellow
             }
         }
 
-        # =============================================
-        # RECURSIVE FUZZING - EXECUTA TERCEIRO (SEMPRE)
-        # =============================================
+        # RECURSIVE FUZZING PRINCIPAL
         Write-Log "INICIANDO SCAN RECURSIVO PRINCIPAL" "INFO"
         Write-Host "`n[FUZZING] Starting smart recursive scan..." -ForegroundColor Magenta
         
         $basePath = $baseUrl
 
-        Write-Host "   (Duplicates and filtered status codes are shown in dark gray)" -ForegroundColor Gray
         Write-Host "   Base Path: $basePath" -ForegroundColor Gray
         Write-Host "   Starting recursion with $($words.Count) words, depth: $MaxDepth `n" -ForegroundColor Gray
         
@@ -3262,40 +3273,29 @@ function Start-FuzzingRecursive {
         } catch {
             Write-Log "Erro no recursive fuzzing: $($_.Exception.Message)" "ERROR"
             Write-Host "[ERROR] Recursive fuzzing failed: $($_.Exception.Message)" -ForegroundColor Red
-            Write-Host "   Partial results will be shown..." -ForegroundColor Yellow
         }
        
         $stats = $session.GetStatistics()
         
         Write-Log "SCAN CONCLUIDO - Total de requests: $($stats.TotalRequests)" "INFO"
         Write-Log "SCAN CONCLUIDO - Endpoints validos: $($stats.ValidEndpoints)" "INFO"
-        Write-Log "SCAN CONCLUIDO - Duplicatas filtradas: $($stats.DuplicatesFiltered)" "INFO"
-        Write-Log "SCAN CONCLUIDO - Filtrados por status: $($stats.FilteredByStatus)" "INFO"
-        Write-Log "SCAN CONCLUIDO - Eficiencia: $($stats.EfficiencyRate)%" "INFO"
 
-        Write-Host "`n[SCAN COMPLETE]" -ForegroundColor Green
-        Write-Host "   Total Requests: $($stats.TotalRequests)" -ForegroundColor White
-        Write-Host "   Valid Endpoints: $($stats.ValidEndpoints)" -ForegroundColor Cyan
-        Write-Host "   Duplicates Filtered: $($stats.DuplicatesFiltered)" -ForegroundColor DarkYellow
-        Write-Host "   Filtered by Status: $($stats.FilteredByStatus)" -ForegroundColor Yellow
-        Write-Host "   Duration: $([math]::Round($stats.DurationSeconds, 1))s" -ForegroundColor White
-        Write-Host "   Speed: $([math]::Round($stats.RequestsPerSecond, 1)) req/s" -ForegroundColor White
-        Write-Host "   Efficiency: $([math]::Round($stats.EfficiencyRate, 1))%" -ForegroundColor $(if ($stats.EfficiencyRate -gt 5) { "Green" } elseif ($stats.EfficiencyRate -gt 1) { "Yellow" } else { "Red" })
-
-        # FILTRA RESULTADOS FINAIS PELA CONFIGURAÇÃO DE STATUS CODES
+        # FILTRA RESULTADOS FINAIS
         if ($global:FuzzingStatusCodes.Count -gt 0) {
-            $finalResults = $session.AllResults | Where-Object { $global:FuzzingStatusCodes -contains $_.StatusCode } | Sort-Object Depth, StatusCode | Select-Object -Unique
+            $finalResults = $session.AllResults | Where-Object { $global:FuzzingStatusCodes -contains $_.StatusCode } | Sort-Object Depth, StatusCode
         } else {
-            $finalResults = $session.AllResults | Sort-Object Depth, StatusCode | Select-Object -Unique
+            $finalResults = $session.AllResults | Sort-Object Depth, StatusCode
         }
         
-        if ($finalResults.Count -gt 0) {
-            Write-Log "RELATORIO FINAL: $($finalResults.Count) endpoints validos encontrados (apos filtro)" "INFO"
-            Write-Host "`n[VALID ENDPOINTS FOUND]:" -ForegroundColor Green
+        $validResults = $finalResults | Where-Object { $_.IsValid -eq $true }
+        
+        if ($validResults.Count -gt 0) {
+            Write-Log "RELATORIO FINAL: $($validResults.Count) endpoints validos encontrados" "INFO"
+            Write-Host "`n[RESULTS] Found $($validResults.Count) valid endpoints:" -ForegroundColor Green
             
-            # Agrupa por tipo para melhor organização
-            $subdomainResults = $finalResults | Where-Object { $_.Type -eq "Subdomain" -and $_.IsValid -eq $true }
-            $pathResults = $finalResults | Where-Object { $_.Type -eq "Path" -and $_.IsValid -eq $true }
+            # Agrupa por tipo
+            $subdomainResults = $validResults | Where-Object { $_.Type -eq "Subdomain" }
+            $pathResults = $validResults | Where-Object { $_.Type -eq "Path" }
             
             if ($subdomainResults.Count -gt 0) {
                 Write-Host "`n  [SUBDOMAINS] ($($subdomainResults.Count)):" -ForegroundColor Cyan
@@ -3307,9 +3307,6 @@ function Start-FuzzingRecursive {
                     Write-Host "$($result.URL)" -ForegroundColor White
                     if ($result.Title -and $result.Title -ne "No Title") {
                         Write-Host "         Title: $($result.Title)" -ForegroundColor Magenta
-                    }
-                    if ($result.ContentLength -gt 0) {
-                        Write-Host "         Size: $($result.ContentLength) bytes" -ForegroundColor Gray
                     }
                 }
             }
@@ -3325,38 +3322,26 @@ function Start-FuzzingRecursive {
                     if ($result.Title -and $result.Title -ne "No Title") {
                         Write-Host "         Title: $($result.Title)" -ForegroundColor Magenta
                     }
-                    if ($result.ContentLength -gt 0) {
-                        Write-Host "         Size: $($result.ContentLength) bytes" -ForegroundColor Gray
-                    }
                 }
             }
-            
-            # Salva resultados em arquivo
-            $timestamp = Get-Date -Format "yyyyMMdd_HHmmss"
-            $resultsFile = "fuzzing_results_${timestamp}.csv"
-            
-            try {
-                $finalResults | Export-Csv -Path $resultsFile -NoTypeInformation -Encoding UTF8
-                Write-Log "Resultados salvos em: $resultsFile" "INFO"
-                Write-Host "`n   Results saved to: $resultsFile" -ForegroundColor Gray
-            } catch {
-                Write-Log "Erro ao salvar resultados: $($_.Exception.Message)" "ERROR"
-                Write-Host "   [WARNING] Could not save results to file" -ForegroundColor Yellow
-            }
-            
-            return $finalResults
+            Write-Host "`n[SCAN COMPLETE]" -ForegroundColor Green
+            Write-Host "   Total Requests: $($stats.TotalRequests)" -ForegroundColor White
+            Write-Host "   Valid Endpoints: $($stats.ValidEndpoints)" -ForegroundColor Cyan
+            Write-Host "   Duration: $([math]::Round($stats.DurationSeconds, 1))s" -ForegroundColor White
+            Write-Host "   Speed: $([math]::Round($stats.RequestsPerSecond, 1)) req/s" -ForegroundColor White
+            Write-Host ""
+            #return $validResults.Count
+            return 
         } else {
-            Write-Log "Nenhum endpoint valido encontrado apos filtro" "INFO"
-            Write-Host "`n[RESULTS] No real endpoints found (after status code filtering)" -ForegroundColor Yellow
+            Write-Log "Nenhum endpoint valido encontrado" "INFO"
+            Write-Host "`n[RESULTS] No valid endpoints found" -ForegroundColor Yellow
             Write-Host "   Try adjusting timeout, status codes, or using a different wordlist" -ForegroundColor Gray
             return @()
         }
 
     } catch {
         Write-Log "ERRO FATAL em Start-FuzzingRecursive: $($_.Exception.Message)" "ERROR"
-        Write-Log "Stack trace: $($_.Exception.StackTrace)" "DEBUG"
         Write-Host "[FATAL ERROR] $($_.Exception.Message)" -ForegroundColor Red
-        Write-Host "   Check the logs for more details" -ForegroundColor Gray
         return @()
     } finally {
         Write-Log "=== FUZZING RECURSIVO FINALIZADO ===" "INFO"
@@ -3385,8 +3370,6 @@ function RunAllScans {
         $null = Read-Host
         return
     }
-    
-    # Prepara a lista de scans para exibição (todos os scans com status)
     $scansForDisplay = $global:AllScans.Clone()
     foreach ($scan in $scansForDisplay) {
         # Marca como habilitado se estiver na configuração
@@ -3395,7 +3378,6 @@ function RunAllScans {
     
     $width = 180
 
-    # formata o índice para que números de 1 digito e 2 digitos fiquem alinhados
     $indexFormat = '{0,2}. {1}'
 
     # calcula a linha "entry" mais longa (sem o status)
