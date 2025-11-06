@@ -30,7 +30,7 @@ function Logo_Menu {
                                     |_  ..  _|   | |_) |/ _//\\ \ /\ / // _ \| '__|  | | | || || | | |/ __|   | |_) |/  _ \ / __|     / /
                                     |_      _|   | .__/| (//) |\ V  V /|  __/| |     | |_/ || || | | |\__ \   | .__/|  ___/| (__     |_|
                                       |_||_|     |_|    \//__/  \_/\_/  \___||_|     |____/ |_||_| |_||___/   |_|    \____| \___|
-                                                        //               | |                (_)        |_|                           (_)           2.4.7v
+                                                        //               | |                (_)        |_|                           (_)           2.3.3v
 
                                          
 "@ -split "`n"
@@ -2399,7 +2399,7 @@ function Get-StatusCodeColor {
     
     switch ($StatusCode) {
         200 { return "Green" }
-        301 { return "Magenta" }
+        301 { return "Blue" }
         302 { return "DarkGreen" }
         400 { return "DarkRed" }
         403 { return "Magenta" }
