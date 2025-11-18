@@ -393,6 +393,33 @@ function Get-EstimatedTime {
     return $minutes
 }
 
+function Get-AbsolutePath {
+    param([string]$RelativePath)
+    
+    if ([System.IO.Path]::IsPathRooted($RelativePath)) {
+        return $RelativePath
+    }
+    
+    # Tentar diferentes bases
+    $bases = @(
+        $PSScriptRoot,
+        (Get-Location).Path,
+        (Split-Path -Parent $MyInvocation.MyCommand.Definition),
+        "."
+    )
+    
+    foreach ($base in $bases) {
+        if ($base) {
+            $fullPath = Join-Path $base $RelativePath
+            if (Test-Path $fullPath) {
+                return (Convert-Path $fullPath)
+            }
+        }
+    }
+    
+    return $RelativePath
+}
+
 # =============================================
 # FUNÇÕES AUXILIARES / Validate-scans
 # =============================================
@@ -1103,12 +1130,13 @@ function ScanHTML {
             Write-Host "`nNo relevant words were found in the HTML." -ForegroundColor Red
         }
 
+        $absolutePath = Convert-Path $fullPath
+        
         return @{
             Words = $palavras
-            SavedFilePath = $null
+            SavedFilePath = $absolutePath  # ← AGORA SEMPRE ABSOLUTO
             TotalWords = $palavras.Count
         }
-
     } catch {
         Write-ErrorWeb -ErrorObject $_
         return @{
@@ -3080,7 +3108,6 @@ function Start-FuzzingRecursive {
         [string]$wordlist,
         [int]$MaxDepth = $global:FuzzingMaxDepth,
         [int]$TimeoutMs = $global:FuzzingTimeoutMs,
-        [switch]$Aggressive = $global:FuzzingAggressive,
         [int]$MaxThreads = $global:FuzzingMaxThreads,
         [switch]$SubdomainFuzzing = $global:FuzzingSubdomain
     )
@@ -3088,60 +3115,101 @@ function Start-FuzzingRecursive {
     $session = [FuzzingSession]::new()
     
     try {
-        Write-Log "=== INICIANDO FUZZING RECURSIVO AVANÇADO ===" "INFO"
-        Write-Log "Alvo: $url" "INFO"
+        Write-Log "=== STARTING ADVANCED RECURSIVE FUZZING ===" "INFO"
+        Write-Log "Target: $url" "INFO"
         Write-Log "Wordlist: $wordlist" "INFO"
-        Write-Log "Profundidade maxima: $MaxDepth" "INFO"
+        
+        Write-Host "`n[DEBUG] Wordlist path received: $wordlist" -ForegroundColor Cyan
+        
+        # Resolve absolute path
+        if (-not [System.IO.Path]::IsPathRooted($wordlist)) {
+            # If relative path, convert to absolute based on script directory
+            $scriptDir = $PSScriptRoot
+            if (-not $scriptDir) {
+                $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Definition
+            }
+            $wordlist = Join-Path $scriptDir $wordlist
+            Write-Host "[DEBUG] Path converted to absolute: $wordlist" -ForegroundColor Cyan
+        }
+        
+        Write-Host "[DEBUG] Checking file existence..." -ForegroundColor Cyan
+        
+        if (-not (Test-Path $wordlist)) {
+            Write-Log "Wordlist not found: $wordlist" "ERROR"
+            Write-Host "[ERROR] Wordlist not found: $wordlist" -ForegroundColor Red
+            Write-Host "[DEBUG] Trying to locate file alternatively..." -ForegroundColor Yellow
+            
+            # Try to find the file in other possible locations
+            $possiblePaths = @(
+                $wordlist,
+                "Fuzz_files\$([System.IO.Path]::GetFileName($wordlist))",
+                ".\Fuzz_files\$([System.IO.Path]::GetFileName($wordlist))",
+                "..\Fuzz_files\$([System.IO.Path]::GetFileName($wordlist))",
+                ".\$([System.IO.Path]::GetFileName($wordlist))"
+            )
+            
+            foreach ($path in $possiblePaths) {
+                if (Test-Path $path) {
+                    $wordlist = $path
+                    Write-Host "[DEBUG] File found at: $wordlist" -ForegroundColor Green
+                    break
+                }
+            }
+            
+            if (-not (Test-Path $wordlist)) {
+                Write-Host "[ERROR] File not found in any possible location!" -ForegroundColor Red
+                return @()
+            }
+        }
+
+        Write-Host "[DEBUG] Wordlist confirmed: $wordlist" -ForegroundColor Green
+        Write-Host "[DEBUG] File exists: $(Test-Path $wordlist)" -ForegroundColor Green
+        Write-Host "[DEBUG] File size: $((Get-Item $wordlist).Length) bytes" -ForegroundColor Green
+        
+        $words = [System.IO.File]::ReadAllLines($wordlist) | Where-Object { 
+            -not [string]::IsNullOrEmpty($_) -and $_.Length -gt 2 
+        }
+        
+        if ($words.Count -eq 0) {
+            Write-Log "No valid words in wordlist: $wordlist" "ERROR"
+            Write-Host "[ERROR] No valid words in wordlist" -ForegroundColor Red
+            return @()
+        }
+
+        Write-Log "Wordlist loaded with $($words.Count) valid words" "INFO"
+        Write-Log "Maximum depth: $MaxDepth" "INFO"
         Write-Log "Timeout: ${TimeoutMs}ms" "INFO"
         
         Write-Host "`n[ADVANCED RECURSIVE FUZZING]" -ForegroundColor Magenta
         Write-Host "   Target: $url" -ForegroundColor White
         Write-Host "   Wordlist: $wordlist" -ForegroundColor White
         
-        # MOSTRA CONFIGURAÇÃO ATUAL DE STATUS CODES
+        # SHOW CURRENT STATUS CODES CONFIGURATION
         Write-Host "   Status Codes: " -NoNewline -ForegroundColor White
         if ($global:FuzzingStatusCodes.Count -eq 0) {
             Write-Host "ALL (Showing all status codes)" -ForegroundColor Cyan
         } else {
             Write-Host "$($global:FuzzingStatusCodes.Count) codes configured" -ForegroundColor Yellow
         }
-        
-        if (-not (Test-Path $wordlist)) {
-            Write-Log "Wordlist nao encontrada: $wordlist" "ERROR"
-            Write-Host "[ERROR] Wordlist not found: $wordlist" -ForegroundColor Red
-            return @()
-        }
 
-        $words = [System.IO.File]::ReadAllLines($wordlist) | Where-Object { 
-            -not [string]::IsNullOrEmpty($_) -and $_.Length -gt 2 
-        }
-        
-        if ($words.Count -eq 0) {
-            Write-Log "Nenhuma palavra valida na wordlist: $wordlist" "ERROR"
-            Write-Host "[ERROR] No valid words in wordlist" -ForegroundColor Red
-            return @()
-        }
-
-        Write-Log "Wordlist carregada com $($words.Count) palavras validas" "INFO"
-
-        # CONFIGURAÇÕES INTELIGENTES
+        # INTELLIGENT CONFIGURATIONS
         try {
             $baseUri = [System.Uri]$url
             $baseUrl = $baseUri.GetLeftPart([System.UriPartial]::Path)
             $baseHost = $baseUri.Host
         } catch {
-            Write-Log "URL invalida: $url - $($_.Exception.Message)" "ERROR"
+            Write-Log "Invalid URL: $url - $($_.Exception.Message)" "ERROR"
             Write-Host "[ERROR] Invalid URL: $url" -ForegroundColor Red
             Write-Host "       Details: $($_.Exception.Message)" -ForegroundColor Gray
             return @()
         }
         
-        # Garante que a base URL termina com /
+        # Ensure base URL ends with /
         if (-not $baseUrl.EndsWith('/')) {
             $baseUrl += '/'
         }
         
-        Write-Log "URL base configurada: $baseUrl" "INFO"
+        Write-Log "Base URL configured: $baseUrl" "INFO"
         Write-Log "Host: $baseHost" "INFO"
         
         Write-Host "`n[CONFIGURATION STATUS]" -ForegroundColor Cyan
@@ -3188,13 +3256,13 @@ function Start-FuzzingRecursive {
             Write-Host ""
         }
 
-        Write-Log "Analisando pagina base..." "INFO"
+        Write-Log "Analyzing base page..." "INFO"
         Write-Host "`n[ANALYSIS] Analyzing base page..." -ForegroundColor Green
         
         $baseSignature = Get-PageSignature -Url $url
         
         if (-not $baseSignature -or $baseSignature.StatusCode -ne 200) {
-            Write-Log "Pagina base com problemas - Status: $($baseSignature.StatusCode)" "WARNING"
+            Write-Log "Base page has issues - Status: $($baseSignature.StatusCode)" "WARNING"
             Write-Host "[WARNING] Base page analysis had issues" -ForegroundColor Yellow
             
             if ($baseSignature) {
@@ -3206,7 +3274,7 @@ function Start-FuzzingRecursive {
             
             Write-Host "  Continuing with fallback signature..." -ForegroundColor Yellow
             
-            # Criar assinatura fallback
+            # Create fallback signature
             $baseSignature = @{
                 Url = $url
                 Title = "Fallback - Base Page Unavailable"
@@ -3217,7 +3285,7 @@ function Start-FuzzingRecursive {
                 ContentType = "unknown"
             }
         } else {
-            Write-Log "Pagina base analisada - Titulo: '$($baseSignature.Title)', Tamanho: $($baseSignature.ContentLength) chars" "INFO"
+            Write-Log "Base page analyzed - Title: '$($baseSignature.Title)', Size: $($baseSignature.ContentLength) chars" "INFO"
             Write-Host "  Base Page: $($baseSignature.Title)" -ForegroundColor Gray
             Write-Host "  Size: $($baseSignature.ContentLength) chars" -ForegroundColor Gray
             Write-Host "  Hash: $($baseSignature.ContentHash)" -ForegroundColor Gray
@@ -3254,13 +3322,13 @@ function Start-FuzzingRecursive {
                 }
                 
             } catch {
-                Write-Log "Erro no subdomain fuzzing: $($_.Exception.Message)" "ERROR"
+                Write-Log "Error in subdomain fuzzing: $($_.Exception.Message)" "ERROR"
                 Write-Host "[ERROR] Subdomain fuzzing failed: $($_.Exception.Message)" -ForegroundColor Red
             }
         }
 
-        # RECURSIVE FUZZING PRINCIPAL
-        Write-Log "INICIANDO SCAN RECURSIVO PRINCIPAL" "INFO"
+        # MAIN RECURSIVE FUZZING
+        Write-Log "STARTING MAIN RECURSIVE SCAN" "INFO"
         Write-Host "`n[FUZZING] Starting smart recursive scan..." -ForegroundColor Magenta
         
         $basePath = $baseUrl
@@ -3271,16 +3339,16 @@ function Start-FuzzingRecursive {
         try {
             Invoke-SmartRecursion -basePath $basePath -wordList $words -currentDepth 1 -maxDepth $MaxDepth -allResults $session.AllResults -visitedUrls $session.VisitedUrls -contentHashes $session.ContentHashes -baseSignature $baseSignature -TimeoutMs $TimeoutMs -session $session
         } catch {
-            Write-Log "Erro no recursive fuzzing: $($_.Exception.Message)" "ERROR"
+            Write-Log "Error in recursive fuzzing: $($_.Exception.Message)" "ERROR"
             Write-Host "[ERROR] Recursive fuzzing failed: $($_.Exception.Message)" -ForegroundColor Red
         }
        
         $stats = $session.GetStatistics()
         
-        Write-Log "SCAN CONCLUIDO - Total de requests: $($stats.TotalRequests)" "INFO"
-        Write-Log "SCAN CONCLUIDO - Endpoints validos: $($stats.ValidEndpoints)" "INFO"
+        Write-Log "SCAN COMPLETED - Total requests: $($stats.TotalRequests)" "INFO"
+        Write-Log "SCAN COMPLETED - Valid endpoints: $($stats.ValidEndpoints)" "INFO"
 
-        # FILTRA RESULTADOS FINAIS
+        # FILTER FINAL RESULTS
         if ($global:FuzzingStatusCodes.Count -gt 0) {
             $finalResults = $session.AllResults | Where-Object { $global:FuzzingStatusCodes -contains $_.StatusCode } | Sort-Object Depth, StatusCode
         } else {
@@ -3290,10 +3358,10 @@ function Start-FuzzingRecursive {
         $validResults = $finalResults | Where-Object { $_.IsValid -eq $true }
         
         if ($validResults.Count -gt 0) {
-            Write-Log "RELATORIO FINAL: $($validResults.Count) endpoints validos encontrados" "INFO"
+            Write-Log "FINAL REPORT: $($validResults.Count) valid endpoints found" "INFO"
             Write-Host "`n[RESULTS] Found $($validResults.Count) valid endpoints:" -ForegroundColor Green
             
-            # Agrupa por tipo
+            # Group by type
             $subdomainResults = $validResults | Where-Object { $_.Type -eq "Subdomain" }
             $pathResults = $validResults | Where-Object { $_.Type -eq "Path" }
             
@@ -3330,25 +3398,23 @@ function Start-FuzzingRecursive {
             Write-Host "   Duration: $([math]::Round($stats.DurationSeconds, 1))s" -ForegroundColor White
             Write-Host "   Speed: $([math]::Round($stats.RequestsPerSecond, 1)) req/s" -ForegroundColor White
             Write-Host ""
-            #return $validResults.Count
             return 
         } else {
-            Write-Log "Nenhum endpoint valido encontrado" "INFO"
+            Write-Log "No valid endpoints found" "INFO"
             Write-Host "`n[RESULTS] No valid endpoints found" -ForegroundColor Yellow
             Write-Host "   Try adjusting timeout, status codes, or using a different wordlist" -ForegroundColor Gray
             return @()
         }
 
     } catch {
-        Write-Log "ERRO FATAL em Start-FuzzingRecursive: $($_.Exception.Message)" "ERROR"
+        Write-Log "FATAL ERROR in Start-FuzzingRecursive: $($_.Exception.Message)" "ERROR"
         Write-Host "[FATAL ERROR] $($_.Exception.Message)" -ForegroundColor Red
         return @()
     } finally {
-        Write-Log "=== FUZZING RECURSIVO FINALIZADO ===" "INFO"
+        Write-Log "=== RECURSIVE FUZZING FINISHED ===" "INFO"
         Write-Host "`n[FINAL] Fuzzing session completed" -ForegroundColor DarkGreen
     }
 }
-
 # =============================================
 # FUNÇÕES DE EXECUÇÃO E MENU
 # =============================================
@@ -4116,15 +4182,25 @@ function PowerDiNSpec {
                 Write-Host ""
                 $url = Show-InputPrompt -input_name "Enter the website URL (ex: http://scanme.nmap.org)" -PaddingLeft 19
                 if (Test-ValidUrl $url) {
-                    # Primeiro 16 as palavras
+                    # Primeiro scan as palavras
                     $resultadoScan = ScanHTML -url $url
                     
+                    Write-Host "[DEBUG] Resultw ScanHTML:" -ForegroundColor Cyan
+                    Write-Host "  SavedFilePath: $($resultadoScan.SavedFilePath)" -ForegroundColor White
+                    Write-Host "  TotalWords: $($resultadoScan.TotalWords)" -ForegroundColor White
+                    
                     if ($resultadoScan.SavedFilePath -and (Test-Path $resultadoScan.SavedFilePath)) {
+                        # CORREÇÃO SIMPLIFICADA - Usar caminho absoluto diretamente
+                        $wordlistPath = Convert-Path $resultadoScan.SavedFilePath
+                        Write-Host "[DEBUG] path absolute from wordlist: $wordlistPath" -ForegroundColor Green
+                        
                         Write-Host "`nStarting recursive fuzzing automatically..." -ForegroundColor Yellow
                         Start-Sleep -Seconds 2
-                        Start-FuzzingRecursive -url $url -wordlist $resultadoScan.SavedFilePath
+                        Start-FuzzingRecursive -url $url -wordlist $wordlistPath
                     } else {
-                        Write-Host "`nFuzzing cancelled - no wordlist file was saved." -ForegroundColor Yellow
+                        Write-Host "`nFuzzing cancelled - no wordlist file was saved or file not found." -ForegroundColor Yellow
+                        Write-Host "SavedFilePath was: $($resultadoScan.SavedFilePath)" -ForegroundColor Gray
+                        Write-Host "File exists: $(if ($resultadoScan.SavedFilePath) { Test-Path $resultadoScan.SavedFilePath } else { 'No path' })" -ForegroundColor Gray
                     }
                 } else {
                     Write-Host "`n               Invalid URL. Use http:// or https://" -ForegroundColor Red
@@ -4164,7 +4240,7 @@ function PowerDiNSpec {
             }
             
             default {
-                Write-Host "`n`n               Invalid option. Choose a number between 0 and 16." -ForegroundColor Red
+                Write-Host "`n`n               Invalid option. Choose a number between 0 and 16." -ForegroundColor Red  
                 Write-Host "`n               Press Enter to continue..." -ForegroundColor Gray
                 $null = Read-Host
             }
